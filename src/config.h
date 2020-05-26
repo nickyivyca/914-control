@@ -112,6 +112,6 @@ extern CAN* canBus;
 // CAN frequency to used
 // default: 500k
 #ifndef CAN_FREQUENCY
-#define CAN_FREQUENCY 500000
+#define CAN_FREQUENCY 250000
 #endif
 
