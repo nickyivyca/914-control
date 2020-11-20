@@ -3,6 +3,9 @@
 #include "mbed.h"
 #include "rtos.h"
 
+#include "LTC681xBus.h"
+#include "BmsThread.h"
+
 
 Serial* serial;
 CAN* canBus;
@@ -15,6 +18,16 @@ int main() {
 
   ThisThread::sleep_for(1000);
 
+  SPI* spiDriver = new SPI(PIN_6820_SPI_MOSI,
+                           PIN_6820_SPI_MISO,
+                           PIN_6820_SPI_SCLK,
+                           PIN_6820_SPI_SSEL,
+                           use_gpio_ssel);
+  spiDriver->format(8, 0);
+  LTC681xBus ltcBus = LTC681xBus(spiDriver);
+
+  BMSThread bmsThread(&ltcBus, 1);
+
   DigitalOut led(LED1);
   // Flash LEDs to indicate startup
   for (int i = 0; i < 4; i++) {
@@ -24,7 +37,7 @@ int main() {
     ThisThread::sleep_for(50);
   }
 
-  CANMessage msg;
+  /*CANMessage msg;
   while (1) {
     if (canBus->read(msg)) {
       serial->printf("Received with ID %#010x length %d\n", msg.id, msg.len);
@@ -55,7 +68,7 @@ int main() {
     }
     // Sleep 100 secs
     //ThisThread::sleep_for(100 * 1000);
-  }
+  }*/
 }
 
 void initIO() {

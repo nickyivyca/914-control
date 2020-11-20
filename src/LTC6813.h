@@ -2,6 +2,8 @@
 
 #include "LTC681xBus.h"
 
+#include "config.h"
+
 class LTC6813 {
  public:
   enum class GPIOOutputState : uint8_t {
@@ -20,7 +22,7 @@ class LTC6813 {
   enum class AdcModeOption : uint8_t { kDefault = 0, kLowSpeed = 1 };
   union DischargeState {
     struct {
-      uint8_t cell18 : 1, cell17 : 1, cell16 : 1, cell5 : 1, cell14 : 1,
+      uint8_t cell18 : 1, cell17 : 1, cell16 : 1, cell15 : 1, cell14 : 1,
           cell13 : 1, cell12 : 1, cell11 : 1, cell10 : 1, cell9 : 1,
           cell8 : 1, cell7 : 1, cell6 : 1, cell5 : 1, cell4 : 1, cell3 : 1,
           cell2 : 1, cell1 : 1;
@@ -72,16 +74,15 @@ class LTC6813 {
     uint8_t DCCGPIO9PullDownEnable : 1;
   };
 
-  LTC6813(LTC681xBus &bus, uint8_t id);
+  LTC6813(LTC681xBus &bus);
   Configuration &getConfig();
   void updateConfig();
 
-  uint16_t *getVoltages();
+  void getVoltages(uint16_t voltages[NUM_CHIPS][18]);
   uint16_t *getGpio();
   uint16_t *getGpioPin(GpioSelection pin);
 
  private:
   LTC681xBus &m_bus;
-  uint8_t m_id;
   Configuration m_config;
 };

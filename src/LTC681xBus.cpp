@@ -1,7 +1,7 @@
 #include "LTC681xBus.h"
 
 // TODO: stdout should not be in this header
-#include "BmsConfig.h"
+#include "config.h"
 
 #include "mbed.h"
 
@@ -44,6 +44,12 @@ void LTC681xBus::releaseSpi() {
 }
 
 void LTC681xBus::wakeupSpi() {
+  acquireSpi();
+  releaseSpi();
+}
+
+void LTC681xBus::wakeupChainSpi() {
+  // TODO: this needs to work differently to wake up chain apparently
   acquireSpi();
   releaseSpi();
 }
@@ -168,6 +174,45 @@ void LTC681xBus::readCommand(Command txCmd, uint8_t *rxbuf) {
   if (!goodPec) {
     // TODO: return error or throw out read result
     serial->printf("ERR: Bad PEC on read. Computed: 0x%x. Actual: 0x%x\r\n", dataPec, (uint16_t)(rxbuf[6] << 8 | rxbuf[7]));
+  }
+}
+
+void LTC681xBus::readWholeChainCommand(Command txCmd, uint8_t **rxbuf) {
+  uint8_t cmdCode[2] = {(uint8_t)(txCmd.value >> 8), (uint8_t)(txCmd.value)};
+  uint16_t cmdPec = calculatePec(2, cmdCode);
+  uint8_t cmd[4] = {cmdCode[0], cmdCode[1],
+                    (uint8_t)(cmdPec >> 8),
+                    (uint8_t)(cmdPec)};
+#ifdef DEBUG
+  for (int i = 0; i < 4; i++) {
+    serial->printf("CMD: %d: 0x%x\r\n", i, cmd[i]);
+  }
+#endif
+
+  wakeupSpi();
+  acquireSpi();
+  m_spiDriver->write((const char *)cmd, 4, NULL, 0);
+  for (int i = 0; i < NUM_CHIPS; i++) {
+    m_spiDriver->write(NULL, 0, (char *)&rxbuf[i], 8);
+  }
+  releaseSpi();
+
+#ifdef DEBUG
+  for (int j = 0; j < NUM_CHIPS; j++) {
+    for (int i = 0; i < 8; i++) {
+      serial->printf("READ: %d: 0x%x\r\n", i, rxbuf[j][i]);
+    }
+  ]
+#endif
+
+  for (unsigned int i = 0; i < NUM_CHIPS; i++) {
+    uint16_t dataPec = calculatePec(6, rxbuf[i]);
+    bool goodPec = ((uint8_t)(dataPec >> 8)) == rxbuf[i][6] && ((uint8_t)dataPec) == rxbuf[i][7];
+    if (!goodPec) {
+      // TODO: return error or throw out read result
+      serial->printf("ERR: Bad PEC on read on chip %d. Computed: 0x%x. Actual: 0x%x\r\n",
+        i, dataPec, (uint16_t)(rxbuf[i][6] << 8 | rxbuf[i][7]));
+    }
   }
 }
 

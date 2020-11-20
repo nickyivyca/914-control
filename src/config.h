@@ -14,6 +14,19 @@ extern Serial* serial;
 extern CAN* canBus;
 
 
+// Number of 6813 chips on isospi bus
+#ifndef NUM_CHIPS
+#define NUM_CHIPS 1
+#endif
+
+// Number of 6813 chips on isospi bus
+#ifndef NUM_CELLS_PER_CHIP
+#define NUM_CELLS_PER_CHIP 14
+#endif
+
+const int BMS_CELL_MAP[18] = {0, 1, 2, 3, 4, -1, 5, 6, 7, 8, 9, -1, 10, 11, 12, 13, -1, -1};
+
+
 //
 // IO Configuration
 //
@@ -27,24 +40,9 @@ extern CAN* canBus;
 
 // Charger output
 //
-// Controls BMS fault light on dash
+// Controls BMS fault light on dash (and beeper?)
 #ifndef PIN_BMS_FAULT_CONTROL
 #define PIN_BMS_FAULT_CONTROL NC
-#endif
-
-
-
-// Contactor outputs
-//
-//
-#ifndef PIN_CONTACTOR_1_CONTROL
-#define PIN_CONTACTOR_1_CONTROL NC
-#endif
-#ifndef PIN_CONTACTOR_2_CONTROL
-#define PIN_CONTACTOR_2_CONTROL NC
-#endif
-#ifndef PIN_CONTACTOR_3_CONTROL
-#define PIN_CONTACTOR_3_CONTROL NC
 #endif
 
 // Throttle input
@@ -56,17 +54,25 @@ extern CAN* canBus;
 #define PIN_SIG_BRAKE NC
 #endif
 
-// Current input
+// Upper threshold when fault will be thrown for cell voltage
 //
-// Input from analog current sensors
-#ifndef PIN_SIG_CURRENT_1
-#define PIN_SIG_CURRENT_1 NC
+// Units: millivolts
+#ifndef BMS_FAULT_VOLTAGE_THRESHOLD_HIGH
+#define BMS_FAULT_VOLTAGE_THRESHOLD_HIGH 4200
 #endif
-#ifndef PIN_SIG_CURRENT_2
-#define PIN_SIG_CURRENT_1 NC
+
+// Lower threshold when fault will be thrown for cell voltage
+//
+// Units: millivolts
+#ifndef BMS_FAULT_VOLTAGE_THRESHOLD_LOW
+#define BMS_FAULT_VOLTAGE_THRESHOLD_LOW 2550
 #endif
-#ifndef PIN_SIG_CURRENT_3
-#define PIN_SIG_CURRENT_1 NC
+
+// Threshold when cells will be discharged when discharging is enabled.
+//
+// Units: millivolts
+#ifndef BMS_DISCHARGE_THRESHOLD
+#define BMS_DISCHARGE_THRESHOLD 15
 #endif
 
 
@@ -76,22 +82,22 @@ extern CAN* canBus;
 
 // SPI master out slave in
 #ifndef PIN_6820_SPI_MOSI
-#define PIN_SPI_MOSI p5
+#define PIN_6820_SPI_MOSI p5
 #endif
 
 // SPI master in slave out
 #ifndef PIN_6820_SPI_MISO
-#define PIN_SPI_MISO p6
+#define PIN_6820_SPI_MISO p6
 #endif
 
 // SPI clock
 #ifndef PIN_6820_SPI_SCLK
-#define PIN_SPI_SCLK p7
+#define PIN_6820_SPI_SCLK p7
 #endif
 
 // SPI chip select
 #ifndef PIN_6820_SPI_SSEL
-#define PIN_SPI_SSEL p8
+#define PIN_6820_SPI_SSEL p8
 #endif
 
 

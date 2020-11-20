@@ -33,6 +33,7 @@ class LTC681xBus {
   void acquireSpi();
   void releaseSpi();
   void wakeupSpi();
+  void wakeupChainSpi();
 
   void send(uint8_t txCmd[2]);
   void sendData(uint8_t txCmd[2], uint8_t txData[6]);
@@ -40,6 +41,7 @@ class LTC681xBus {
   void sendCommand(Command txCmd);
   void sendCommandWithData(Command txCmd, uint8_t data[6]);
   void readCommand(Command txCmd, uint8_t *rxbuf);
+  void readWholeChainCommand(Command txCmd, uint8_t **rxbuf);
 
  private:
   SPI *m_spiDriver; //TODO
