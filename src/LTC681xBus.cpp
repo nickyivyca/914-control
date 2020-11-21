@@ -49,9 +49,14 @@ void LTC681xBus::wakeupSpi() {
 }
 
 void LTC681xBus::wakeupChainSpi() {
-  // TODO: this needs to work differently to wake up chain apparently
-  acquireSpi();
-  releaseSpi();
+  // Tready: 10us
+  // Twake: 400us
+  // Pulse IsoSPI the number of chips, with delay for Twake in between each
+  for (unsigned int i = 0; i < NUM_CHIPS; i++) {
+    wakeupSpi();
+    // Threads can't delay for microseconds it seems?
+    ThisThread::sleep_for(1);
+  }
 }
 
 void LTC681xBus::send(uint8_t txCmd[2]) {
@@ -107,7 +112,7 @@ void LTC681xBus::sendCommand(Command txCmd) {
                     (uint8_t)(cmdPec >> 8),
                     (uint8_t)(cmdPec)};
 
-  wakeupSpi();
+  //wakeupSpi();
   acquireSpi();
   m_spiDriver->write((const char *)cmd, 4, NULL, 0);
   releaseSpi();
@@ -138,7 +143,7 @@ void LTC681xBus::sendCommandWithData(Command txCmd, uint8_t txData[6]) {
   serial->printf("pec: 0x%x\r\n", dataPec);
 #endif
 
-  wakeupSpi();
+  //wakeupSpi();
   acquireSpi();
   m_spiDriver->write((const char *)cmd, 4, NULL, 0);
   m_spiDriver->write((const char *)data, 8, NULL, 0);
@@ -157,7 +162,7 @@ void LTC681xBus::readCommand(Command txCmd, uint8_t *rxbuf) {
   }
 #endif
 
-  wakeupSpi();
+  //wakeupSpi();
   acquireSpi();
   m_spiDriver->write((const char *)cmd, 4, NULL, 0);
   m_spiDriver->write(NULL, 0, (char *)rxbuf, 8);
@@ -189,7 +194,7 @@ void LTC681xBus::readWholeChainCommand(Command txCmd, uint8_t **rxbuf) {
   }
 #endif
 
-  wakeupSpi();
+  //wakeupSpi();
   acquireSpi();
   m_spiDriver->write((const char *)cmd, 4, NULL, 0);
   for (int i = 0; i < NUM_CHIPS; i++) {

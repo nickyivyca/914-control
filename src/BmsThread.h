@@ -17,6 +17,7 @@ class BMSThread {
  BMSThread(LTC681xBus* bus, unsigned int frequency) : m_bus(bus) {
     m_delay = 1000 / frequency;
     m_chip = new LTC6813(*bus);
+    m_bus->wakeupChainSpi();
     m_chip->updateConfig();
     m_thread.start(callback(&BMSThread::startThread, this));
   }
@@ -60,18 +61,21 @@ class BMSThread {
 
       // Turn on status LED
       conf.gpio4 = LTC6813::GPIOOutputState::kLow;
+      m_bus->wakeupChainSpi();
       m_chip->updateConfig();
 
-      m_chip->getVoltages(voltages);
+      //m_chip->getVoltages(voltages);
+      ThisThread::sleep_for(m_delay*3);
 
       // Turn off status LED
       conf.gpio4 = LTC6813::GPIOOutputState::kHigh;
+      m_bus->wakeupChainSpi();
       m_chip->updateConfig();
 
       // Done with communication at this point
       // Now time to crunch numbers
 
-      for (unsigned int i = 0; i < NUM_CHIPS; i++) {
+      /*for (unsigned int i = 0; i < NUM_CHIPS; i++) {
 
         serial->printf("Chip %d:\n", i);
 
@@ -123,14 +127,14 @@ class BMSThread {
           }
         }
         serial->printf("\n");
-      }
+      }*/
 
-      /*serial->printf("Total Voltage: %dmV\n",
-               totalVoltage);*/
-      serial->printf("Min Voltage: %dmV\n",
+      //serial->printf("Total Voltage: %dmV\n",
+      //         totalVoltage);*/
+      /*serial->printf("Min Voltage: %dmV\n",
                minVoltage);
       serial->printf("Max Voltage: %dmV\n",
-               maxVoltage);
+               maxVoltage);*/
       //delete voltages;
 
       
@@ -197,7 +201,7 @@ class BMSThread {
 #ifdef DEBUG
       //serial->printf("BMS Thread time elapsed: %dms\n", timeElapsed);
 #endif
-      ThisThread::sleep_for(m_delay);
+      ThisThread::sleep_for(m_delay*3);
     }
   }
 };

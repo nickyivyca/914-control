@@ -30,7 +30,7 @@ int main() {
 
   DigitalOut led(LED1);
   // Flash LEDs to indicate startup
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < 7; i++) {
     led = 1;
     ThisThread::sleep_for(50);
     led = 0;
