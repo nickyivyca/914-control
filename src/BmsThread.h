@@ -63,9 +63,10 @@ class BMSThread {
       conf.gpio4 = LTC6813::GPIOOutputState::kLow;
       m_bus->wakeupChainSpi();
       m_chip->updateConfig();
+      m_chip->readConfig();
 
       //m_chip->getVoltages(voltages);
-      ThisThread::sleep_for(m_delay*3);
+      ThisThread::sleep_for(400);
 
       // Turn off status LED
       conf.gpio4 = LTC6813::GPIOOutputState::kHigh;
@@ -201,7 +202,8 @@ class BMSThread {
 #ifdef DEBUG
       //serial->printf("BMS Thread time elapsed: %dms\n", timeElapsed);
 #endif
-      ThisThread::sleep_for(m_delay*3);
+      //ThisThread::sleep_for(m_delay*3);
+      ThisThread::sleep_for(400);
     }
   }
 };

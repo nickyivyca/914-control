@@ -3,6 +3,7 @@
 #include "mbed.h"
 
 #include "LTC681xCommands.h"
+#include "config.h"
 
 class LTC681xBus {
  public:
@@ -41,7 +42,7 @@ class LTC681xBus {
   void sendCommand(Command txCmd);
   void sendCommandWithData(Command txCmd, uint8_t data[6]);
   void readCommand(Command txCmd, uint8_t *rxbuf);
-  void readWholeChainCommand(Command txCmd, uint8_t **rxbuf);
+  void readWholeChainCommand(Command txCmd, uint8_t rxbuf[NUM_CHIPS][8]);
 
  private:
   SPI *m_spiDriver; //TODO

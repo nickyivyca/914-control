@@ -6,6 +6,8 @@
 #include "mbed.h"
 
 constexpr uint16_t LTC681xBus::crc15Table[256];
+#include <bitset>
+#include <iostream>
 
 //DigitalOut chipselect(p8);
 
@@ -53,9 +55,12 @@ void LTC681xBus::wakeupChainSpi() {
   // Twake: 400us
   // Pulse IsoSPI the number of chips, with delay for Twake in between each
   for (unsigned int i = 0; i < NUM_CHIPS; i++) {
+    ThisThread::sleep_for(1);
     wakeupSpi();
     // Threads can't delay for microseconds it seems?
-    ThisThread::sleep_for(1);
+#ifdef DEBUGN
+    //serial->printf("Waking up chip: %d: \n", i);
+#endif
   }
 }
 
@@ -133,12 +138,16 @@ void LTC681xBus::sendCommandWithData(Command txCmd, uint8_t txData[6]) {
   data[6] = (uint8_t)(dataPec >> 8);
   data[7] = (uint8_t)(dataPec);
 
-#ifdef DEBUG
+#ifdef DEBUGN
   for (int i = 0; i < 4; i++) {
-    serial->printf("CMD: %d: 0x%x\r\n", i, cmd[i]);
+    std::bitset<8> c(cmd[i]);
+    std::cout << "CMD: " << c << '\n';
+    //serial->printf("CMD: %d: 0x%x\r\n", i, cmd[i]);
   }
   for (int i = 0; i < 8; i++) {
-    serial->printf("Byte: %d: 0x%x\r\n", i, data[i]);
+    std::bitset<8> c(data[i]);
+    std::cout << "Byte: " << i << ' ' << c << '\n';
+    //serial->printf("Byte: %d: 0x%x\r\n", i, data[i]);
   }
   serial->printf("pec: 0x%x\r\n", dataPec);
 #endif
@@ -182,32 +191,32 @@ void LTC681xBus::readCommand(Command txCmd, uint8_t *rxbuf) {
   }
 }
 
-void LTC681xBus::readWholeChainCommand(Command txCmd, uint8_t **rxbuf) {
+void LTC681xBus::readWholeChainCommand(Command txCmd, uint8_t rxbuf[NUM_CHIPS][8]) {
   uint8_t cmdCode[2] = {(uint8_t)(txCmd.value >> 8), (uint8_t)(txCmd.value)};
   uint16_t cmdPec = calculatePec(2, cmdCode);
   uint8_t cmd[4] = {cmdCode[0], cmdCode[1],
                     (uint8_t)(cmdPec >> 8),
                     (uint8_t)(cmdPec)};
-#ifdef DEBUG
+/*#ifdef DEBUGN
   for (int i = 0; i < 4; i++) {
     serial->printf("CMD: %d: 0x%x\r\n", i, cmd[i]);
   }
-#endif
+#endif*/
 
   //wakeupSpi();
   acquireSpi();
   m_spiDriver->write((const char *)cmd, 4, NULL, 0);
   for (int i = 0; i < NUM_CHIPS; i++) {
-    m_spiDriver->write(NULL, 0, (char *)&rxbuf[i], 8);
+    m_spiDriver->write(NULL, 0, (char *)rxbuf[i], 8);
   }
   releaseSpi();
 
-#ifdef DEBUG
+#ifdef DEBUGN
   for (int j = 0; j < NUM_CHIPS; j++) {
     for (int i = 0; i < 8; i++) {
       serial->printf("READ: %d: 0x%x\r\n", i, rxbuf[j][i]);
     }
-  ]
+  }
 #endif
 
   for (unsigned int i = 0; i < NUM_CHIPS; i++) {

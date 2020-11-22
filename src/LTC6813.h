@@ -77,6 +77,7 @@ class LTC6813 {
   LTC6813(LTC681xBus &bus);
   Configuration &getConfig();
   void updateConfig();
+  void readConfig();
 
   void getVoltages(uint16_t voltages[NUM_CHIPS][18]);
   uint16_t *getGpio();

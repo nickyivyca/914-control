@@ -6,6 +6,8 @@
 #include "LTC681xBus.h"
 
 #include "config.h"
+#include <bitset>
+#include <iostream>
 
 LTC6813::LTC6813(LTC681xBus &bus) : m_bus(bus) {
   m_config =
@@ -28,6 +30,9 @@ LTC6813::LTC6813(LTC681xBus &bus) : m_bus(bus) {
 }
 
 void LTC6813::updateConfig() {
+/*#ifdef DEBUGN
+    serial->printf("Updating config\n");
+#endif*/
   // Create configuration data to write
   uint8_t config[6];
   config[0] = (uint8_t)m_config.gpio5 << 7
@@ -48,8 +53,15 @@ void LTC6813::updateConfig() {
 
   LTC681xBus::Command cmd = LTC681xBus::buildBroadcastCommand(WriteConfigurationGroupA());
   m_bus.sendCommandWithData(cmd, config);
+/*#ifdef DEBUGN
+    serial->printf("Sent config A\n");
+    for (unsigned int i = 0; i < 6; i++) {
+      std::bitset<8> c(config[i]);
+      std::cout << c << '\n';
+    }
+#endif*/
 
-  config[0] = ((m_config.dischargeState.value >> 8) & 0xF0)
+  /*config[0] = ((m_config.dischargeState.value >> 8) & 0xF0)
     | (uint8_t)m_config.gpio9 << 3
     | (uint8_t)m_config.gpio8 << 2
     | (uint8_t)m_config.gpio7 << 1
@@ -62,11 +74,35 @@ void LTC6813::updateConfig() {
   // configgroupb[2-5] are read only
 
   cmd = LTC681xBus::buildBroadcastCommand(WriteConfigurationGroupB());
-
   m_bus.sendCommandWithData(cmd, config);
+#ifdef DEBUGN
+    serial->printf("Sent config B\n");
+    for (unsigned int i = 0; i < 6; i++) {
+      std::bitset<8> c(config[i]);
+      std::cout << c << '\n';
+    }
+#endif*/
 }
 
 LTC6813::Configuration &LTC6813::getConfig() { return m_config; }
+
+void LTC6813::readConfig() {
+
+  // [6 voltage groups][each chip in chain][Register of 6 Bytes + PEC]
+  uint8_t rxbuf[NUM_CHIPS][8];
+
+  m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadConfigurationGroupA()), 
+    rxbuf);
+
+  /*std::cout << "Reading cfg A: \n";
+  for (int i = 0; i < 6; i++) {
+    std::bitset<8> c(rxbuf[0][i]);
+    std::cout << "Byte: " << i << ' ' << c << '\n';
+    //serial->printf("Byte: %d: 0x%x\r\n", i, data[i]);
+  }*/
+
+  //return voltages;
+}
 
 void LTC6813::getVoltages(uint16_t voltages[NUM_CHIPS][18]) {
   auto cmd = StartCellVoltageADC(AdcMode::k7k, false, CellSelection::kAll);
@@ -79,17 +115,17 @@ void LTC6813::getVoltages(uint16_t voltages[NUM_CHIPS][18]) {
   uint8_t rxbuf[6][NUM_CHIPS][8];
 
   m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupA()), 
-    (uint8_t**)rxbuf[0]);
+    rxbuf[0]);
   m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupB()), 
-    (uint8_t**)rxbuf[1]);
+    rxbuf[1]);
   m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupC()), 
-    (uint8_t**)rxbuf[2]);
+    rxbuf[2]);
   m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupD()), 
-    (uint8_t**)rxbuf[3]);
+    rxbuf[3]);
   m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupE()), 
-    (uint8_t**)rxbuf[4]);
+    rxbuf[4]);
   m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupF()), 
-    (uint8_t**)rxbuf[5]);
+    rxbuf[5]);
 
   // Voltage = val • 100μV
   uint8_t cellCursor = 0;

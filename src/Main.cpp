@@ -32,9 +32,9 @@ int main() {
   // Flash LEDs to indicate startup
   for (int i = 0; i < 7; i++) {
     led = 1;
-    ThisThread::sleep_for(50);
+    ThisThread::sleep_for(500);
     led = 0;
-    ThisThread::sleep_for(50);
+    ThisThread::sleep_for(500);
   }
 
   /*CANMessage msg;
@@ -69,6 +69,10 @@ int main() {
     // Sleep 100 secs
     //ThisThread::sleep_for(100 * 1000);
   }*/
+  while (1) {
+    // Sleep 100 secs
+    ThisThread::sleep_for(100 * 1000);
+  }
 }
 
 void initIO() {
