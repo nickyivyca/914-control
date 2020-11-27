@@ -138,7 +138,7 @@ void LTC681xBus::sendCommandWithData(Command txCmd, uint8_t txData[6]) {
   data[6] = (uint8_t)(dataPec >> 8);
   data[7] = (uint8_t)(dataPec);
 
-#ifdef DEBUGN
+/*#ifdef DEBUGN
   for (int i = 0; i < 4; i++) {
     std::bitset<8> c(cmd[i]);
     std::cout << "CMD: " << c << '\n';
@@ -150,7 +150,7 @@ void LTC681xBus::sendCommandWithData(Command txCmd, uint8_t txData[6]) {
     //serial->printf("Byte: %d: 0x%x\r\n", i, data[i]);
   }
   serial->printf("pec: 0x%x\r\n", dataPec);
-#endif
+#endif*/
 
   //wakeupSpi();
   acquireSpi();
