@@ -9,6 +9,8 @@
 #include <bitset>
 #include <iostream>
 
+#include <DigitalOut.h>
+
 LTC6813::LTC6813(LTC681xBus &bus) : m_bus(bus) {
   m_config =
     Configuration{.gpio9 = GPIOOutputState::kPassive,
@@ -61,7 +63,7 @@ void LTC6813::updateConfig() {
     }
 #endif*/
 
-  /*config[0] = ((m_config.dischargeState.value >> 8) & 0xF0)
+  config[0] = ((m_config.dischargeState.value >> 8) & 0xF0)
     | (uint8_t)m_config.gpio9 << 3
     | (uint8_t)m_config.gpio8 << 2
     | (uint8_t)m_config.gpio7 << 1
@@ -75,7 +77,7 @@ void LTC6813::updateConfig() {
 
   cmd = LTC681xBus::buildBroadcastCommand(WriteConfigurationGroupB());
   m_bus.sendCommandWithData(cmd, config);
-#ifdef DEBUGN
+/*#ifdef DEBUGN
     serial->printf("Sent config B\n");
     for (unsigned int i = 0; i < 6; i++) {
       std::bitset<8> c(config[i]);
@@ -94,38 +96,84 @@ void LTC6813::readConfig() {
   m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadConfigurationGroupA()), 
     rxbuf);
 
-  /*std::cout << "Reading cfg A: \n";
+  std::cout << "Reading cfg A: \n";
   for (int i = 0; i < 6; i++) {
     std::bitset<8> c(rxbuf[0][i]);
     std::cout << "Byte: " << i << ' ' << c << '\n';
     //serial->printf("Byte: %d: 0x%x\r\n", i, data[i]);
-  }*/
+  }
 
   //return voltages;
 }
 
 void LTC6813::getVoltages(uint16_t voltages[NUM_CHIPS][18]) {
-  auto cmd = StartCellVoltageADC(AdcMode::k7k, false, CellSelection::kAll);
-  m_bus.sendCommand(LTC681xBus::buildBroadcastCommand(cmd));
+  Timer t;
+  t.start();
+  m_bus.sendCommandNoRelease(LTC681xBus::buildBroadcastCommand
+    (StartCellVoltageADC(AdcMode::k7k, false, CellSelection::kAll)));
+  //m_bus.sendCommandNoRelease(LTC681xBus::buildBroadcastCommand(PollADC()));
+
+  /* 6813 datasheet Page 58
+  If the bottom device communicates in isoSPI mode,
+isoSPI data pulses are sent to the device to update the 
+conversion status. Using LTC6820, this can be achieved
+by just clocking its SCK pin. The conversion status is
+valid only after the bottom LTC6813-1 device receives N
+isoSPI data pulses and the status gets updated for every
+isoSPI data pulse that follows. The device returns a low
+data pulse if any of the devices in the stack is busy performing 
+conversions and returns a high data pulse if all
+the devices are free.*/
+  static constexpr char allones = 0xff;
+  m_bus.m_spiDriver->write(&allones, 1, NULL, 0);
+  m_bus.m_spiDriver->write(&allones, 1, NULL, 0);
+  //serial->printf("Wrote 3x allones, checking now\n");
+  char checkbuf = 0;
+  for (unsigned int i = 0; i < 200; i++) {
+    m_bus.m_spiDriver->write(&allones, 1, &checkbuf, 1);
+    //std::bitset<8> c(checkbuf);    
+    //std::cout << i << ": " << c << '\n';
+    if (checkbuf) {
+      break;
+    }
+  }
+  m_bus.releaseSpi();
+  t.stop();
+
+  //std::cout << t.read_ms() << '\n';
+  std::cout << t.read_us() << '\n';
 
   // Wait 2 ms for ADC to finish
-  ThisThread::sleep_for(2); // TODO: Change. Use adc status polling?
+  ThisThread::sleep_for(10); // TODO: make the above polling actually work
 
   // [6 voltage groups][each chip in chain][Register of 6 Bytes + PEC]
   uint8_t rxbuf[6][NUM_CHIPS][8];
 
+  m_bus.wakeupChainSpi();
   m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupA()), 
     rxbuf[0]);
+  ThisThread::sleep_for(1);
+  //m_bus.releaseSpi();
+  m_bus.wakeupChainSpi();
   m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupB()), 
     rxbuf[1]);
+  ThisThread::sleep_for(1);
+  m_bus.wakeupChainSpi();
   m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupC()), 
     rxbuf[2]);
+  ThisThread::sleep_for(1);
+  //m_bus.wakeupChainSpi();
   m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupD()), 
     rxbuf[3]);
+  ThisThread::sleep_for(1);
+  //m_bus.wakeupChainSpi();
   m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupE()), 
     rxbuf[4]);
+  ThisThread::sleep_for(1);
+  m_bus.wakeupChainSpi();
   m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupF()), 
     rxbuf[5]);
+  //ThisThread::sleep_for(1);
 
   // Voltage = val • 100μV
   uint8_t cellCursor = 0;
@@ -134,6 +182,7 @@ void LTC6813::getVoltages(uint16_t voltages[NUM_CHIPS][18]) {
     for (unsigned int j = 0; j < 6; j++) { // iterate through each cell voltage group
       for (unsigned int i = 0; i < 6; i+= 2) {
         voltages[k][cellCursor] = ((uint16_t)rxbuf[j][k][i]) | ((uint16_t)rxbuf[j][k][i + 1] << 8);
+        //std::cout << (int)cellCursor << ": " << voltages[k][cellCursor] << '\n';
         cellCursor++;
       }
     }

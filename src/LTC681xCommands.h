@@ -107,6 +107,9 @@ class StartSControlPulsing : public LTC681xCommand {
 class ClearSControlGroup : public LTC681xCommand {
   uint16_t toValue() const { return 0x0018; }
 };
+class PollADC : public LTC681xCommand {
+  uint16_t toValue() const { return 0x0714; }
+};
 
 class StartCellVoltageADC : public LTC681xCommand {
  public:

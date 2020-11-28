@@ -63,22 +63,30 @@ class BMSThread {
       conf.gpio4 = LTC6813::GPIOOutputState::kLow;
       m_bus->wakeupChainSpi();
       m_chip->updateConfig();
-      m_chip->readConfig();
+      //m_chip->readConfig();
 
-      //m_chip->getVoltages(voltages);
-      ThisThread::sleep_for(400);
+      m_chip->getVoltages(voltages);
+
+      //ThisThread::sleep_for(400);
+      // Turn off status LED
+      conf.gpio4 = LTC6813::GPIOOutputState::kHigh;
+      //m_bus->wakeupChainSpi();
+      m_chip->updateConfig();
+
+      /*ThisThread::sleep_for(400);
 
       // Turn off status LED
       conf.gpio4 = LTC6813::GPIOOutputState::kHigh;
       m_bus->wakeupChainSpi();
       m_chip->updateConfig();
+      m_chip->readConfig();*/
 
       // Done with communication at this point
       // Now time to crunch numbers
 
-      /*for (unsigned int i = 0; i < NUM_CHIPS; i++) {
+      for (unsigned int i = 0; i < NUM_CHIPS; i++) {
 
-        serial->printf("Chip %d:\n", i);
+        //serial->printf("Chip %d:\n", i);
 
         // Process voltages
         unsigned int totalVoltage = 0;
@@ -87,7 +95,7 @@ class BMSThread {
           uint16_t voltage = voltages[i][j] / 10;
 
 
-          int index = BMS_CELL_MAP[j];
+          unsigned int index = BMS_CELL_MAP[j];
           if (index != -1) {
             //allVoltages[(BMS_BANK_CELL_COUNT * i) + index] = voltage;
 
@@ -97,16 +105,16 @@ class BMSThread {
             totalVoltage += voltage;
             serial->printf("%dmV ", voltage);
 
-            if (voltage >= BMS_FAULT_VOLTAGE_THRESHOLD_HIGH) {
-              // Set fault line
-              serial->printf("***** BMS LOW VOLTAGE FAULT *****\nVoltage at %d\n\n", voltage);
-              throwBmsFault();
-            }
-            if (voltage <= BMS_FAULT_VOLTAGE_THRESHOLD_LOW) {
-              // Set fault line
-              serial->printf("***** BMS HIGH VOLTAGE FAULT *****\nVoltage at %d\n\n", voltage);
-              throwBmsFault();
-            }
+            // if (voltage >= BMS_FAULT_VOLTAGE_THRESHOLD_HIGH) {
+            //   // Set fault line
+            //   serial->printf("***** BMS LOW VOLTAGE FAULT *****\nVoltage at %d\n\n", voltage);
+            //   throwBmsFault();
+            // }
+            // if (voltage <= BMS_FAULT_VOLTAGE_THRESHOLD_LOW) {
+            //   // Set fault line
+            //   serial->printf("***** BMS HIGH VOLTAGE FAULT *****\nVoltage at %d\n\n", voltage);
+            //   throwBmsFault();
+            // }
 
             // Discharge cells if enabled
             if(m_discharging) {
@@ -128,7 +136,13 @@ class BMSThread {
           }
         }
         serial->printf("\n");
-      }*/
+      }
+
+
+      // Turn off status LED
+      /*conf.gpio4 = LTC6813::GPIOOutputState::kHigh;
+      m_bus->wakeupChainSpi();
+      m_chip->updateConfig();*/
 
       //serial->printf("Total Voltage: %dmV\n",
       //         totalVoltage);*/
@@ -203,7 +217,7 @@ class BMSThread {
       //serial->printf("BMS Thread time elapsed: %dms\n", timeElapsed);
 #endif
       //ThisThread::sleep_for(m_delay*3);
-      ThisThread::sleep_for(400);
+      ThisThread::sleep_for(1000);
     }
   }
 };

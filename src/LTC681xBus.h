@@ -40,12 +40,14 @@ class LTC681xBus {
   void sendData(uint8_t txCmd[2], uint8_t txData[6]);
 
   void sendCommand(Command txCmd);
+  void sendCommandNoRelease(Command txCmd);
   void sendCommandWithData(Command txCmd, uint8_t data[6]);
   void readCommand(Command txCmd, uint8_t *rxbuf);
   void readWholeChainCommand(Command txCmd, uint8_t rxbuf[NUM_CHIPS][8]);
 
- private:
   SPI *m_spiDriver; //TODO
+
+ private:
 
   static uint16_t calculatePec(uint8_t length, uint8_t *data);
 

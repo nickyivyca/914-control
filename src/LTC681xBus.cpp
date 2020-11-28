@@ -122,6 +122,18 @@ void LTC681xBus::sendCommand(Command txCmd) {
   m_spiDriver->write((const char *)cmd, 4, NULL, 0);
   releaseSpi();
 }
+void LTC681xBus::sendCommandNoRelease(Command txCmd) {
+  uint8_t cmdCode[2] = {(uint8_t)(txCmd.value >> 8), (uint8_t)(txCmd.value)};
+  uint16_t cmdPec = calculatePec(2, cmdCode);
+  uint8_t cmd[4] = {cmdCode[0], cmdCode[1],
+                    (uint8_t)(cmdPec >> 8),
+                    (uint8_t)(cmdPec)};
+
+  //wakeupSpi();
+  acquireSpi();
+  m_spiDriver->write((const char *)cmd, 4, NULL, 0);
+  //releaseSpi();
+}
 
 void LTC681xBus::sendCommandWithData(Command txCmd, uint8_t txData[6]) {
   uint8_t cmdCode[2] = {(uint8_t)(txCmd.value >> 8), (uint8_t)(txCmd.value)};
