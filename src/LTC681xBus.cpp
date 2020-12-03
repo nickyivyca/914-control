@@ -111,15 +111,7 @@ void LTC681xBus::sendData(uint8_t txCmd[2], uint8_t txData[6]) {
 }
 
 void LTC681xBus::sendCommand(Command txCmd) {
-  uint8_t cmdCode[2] = {(uint8_t)(txCmd.value >> 8), (uint8_t)(txCmd.value)};
-  uint16_t cmdPec = calculatePec(2, cmdCode);
-  uint8_t cmd[4] = {cmdCode[0], cmdCode[1],
-                    (uint8_t)(cmdPec >> 8),
-                    (uint8_t)(cmdPec)};
-
-  //wakeupSpi();
-  acquireSpi();
-  m_spiDriver->write((const char *)cmd, 4, NULL, 0);
+  sendCommandNoRelease(txCmd);
   releaseSpi();
 }
 void LTC681xBus::sendCommandNoRelease(Command txCmd) {
@@ -179,7 +171,9 @@ void LTC681xBus::readCommand(Command txCmd, uint8_t *rxbuf) {
                     (uint8_t)(cmdPec)};
 #ifdef DEBUG
   for (int i = 0; i < 4; i++) {
-    serial->printf("CMD: %d: 0x%x\r\n", i, cmd[i]);
+    //serial->printf("CMD: %d: 0x%x\r\n", i, cmd[i]);
+    std::bitset<8> c(cmd[i]);
+    std::cout << "CMD: " << c << '\n';
   }
 #endif
 
@@ -189,11 +183,11 @@ void LTC681xBus::readCommand(Command txCmd, uint8_t *rxbuf) {
   m_spiDriver->write(NULL, 0, (char *)rxbuf, 8);
   releaseSpi();
 
-#ifdef DEBUG
+/*#ifdef DEBUG
   for (int i = 0; i < 8; i++) {
     serial->printf("READ: %d: 0x%x\r\n", i, rxbuf[i]);
   }
-#endif
+#endif*/
 
   uint16_t dataPec = calculatePec(6, rxbuf);
   bool goodPec = ((uint8_t)(dataPec >> 8)) == rxbuf[6] && ((uint8_t)dataPec) == rxbuf[7];
@@ -209,11 +203,15 @@ void LTC681xBus::readWholeChainCommand(Command txCmd, uint8_t rxbuf[NUM_CHIPS][8
   uint8_t cmd[4] = {cmdCode[0], cmdCode[1],
                     (uint8_t)(cmdPec >> 8),
                     (uint8_t)(cmdPec)};
-/*#ifdef DEBUGN
+              
+#ifdef DEBUGN
+  serial->printf("CMD\n");    
   for (int i = 0; i < 4; i++) {
-    serial->printf("CMD: %d: 0x%x\r\n", i, cmd[i]);
+    //serial->printf("CMD: %d: 0x%x\r\n", i, cmd[i]);
+    std::bitset<8> c(cmd[i]);
+    std::cout << "CMD: " << c << '\n';
   }
-#endif*/
+#endif
 
   //wakeupSpi();
   acquireSpi();
@@ -223,13 +221,13 @@ void LTC681xBus::readWholeChainCommand(Command txCmd, uint8_t rxbuf[NUM_CHIPS][8
   }
   releaseSpi();
 
-#ifdef DEBUGN
+/*#ifdef DEBUGN
   for (int j = 0; j < NUM_CHIPS; j++) {
     for (int i = 0; i < 8; i++) {
       serial->printf("READ: %d: 0x%x\r\n", i, rxbuf[j][i]);
     }
   }
-#endif
+#endif*/
 
   for (unsigned int i = 0; i < NUM_CHIPS; i++) {
     uint16_t dataPec = calculatePec(6, rxbuf[i]);

@@ -107,11 +107,10 @@ void LTC6813::readConfig() {
 }
 
 void LTC6813::getVoltages(uint16_t voltages[NUM_CHIPS][18]) {
-  Timer t;
-  t.start();
+  //Timer t;
+  //t.start();
   m_bus.sendCommandNoRelease(LTC681xBus::buildBroadcastCommand
     (StartCellVoltageADC(AdcMode::k7k, false, CellSelection::kAll)));
-  //m_bus.sendCommandNoRelease(LTC681xBus::buildBroadcastCommand(PollADC()));
 
   /* 6813 datasheet Page 58
   If the bottom device communicates in isoSPI mode,
@@ -125,6 +124,9 @@ data pulse if any of the devices in the stack is busy performing
 conversions and returns a high data pulse if all
 the devices are free.*/
   static constexpr char allones = 0xff;
+  // Clock the pin 
+  // Can only write in blocks of 8 not NUM_CHIPS so this will work until more than 24 chips are on the bus
+  m_bus.m_spiDriver->write(&allones, 1, NULL, 0);
   m_bus.m_spiDriver->write(&allones, 1, NULL, 0);
   m_bus.m_spiDriver->write(&allones, 1, NULL, 0);
   //serial->printf("Wrote 3x allones, checking now\n");
@@ -138,13 +140,10 @@ the devices are free.*/
     }
   }
   m_bus.releaseSpi();
-  t.stop();
+  //t.stop();
 
   //std::cout << t.read_ms() << '\n';
-  std::cout << t.read_us() << '\n';
-
-  // Wait 2 ms for ADC to finish
-  ThisThread::sleep_for(10); // TODO: make the above polling actually work
+  //std::cout << t.read_us() << '\n';
 
   // [6 voltage groups][each chip in chain][Register of 6 Bytes + PEC]
   uint8_t rxbuf[6][NUM_CHIPS][8];
@@ -152,25 +151,14 @@ the devices are free.*/
   m_bus.wakeupChainSpi();
   m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupA()), 
     rxbuf[0]);
-  ThisThread::sleep_for(1);
-  //m_bus.releaseSpi();
-  m_bus.wakeupChainSpi();
   m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupB()), 
     rxbuf[1]);
-  ThisThread::sleep_for(1);
-  m_bus.wakeupChainSpi();
   m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupC()), 
     rxbuf[2]);
-  ThisThread::sleep_for(1);
-  //m_bus.wakeupChainSpi();
   m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupD()), 
     rxbuf[3]);
-  ThisThread::sleep_for(1);
-  //m_bus.wakeupChainSpi();
   m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupE()), 
     rxbuf[4]);
-  ThisThread::sleep_for(1);
-  m_bus.wakeupChainSpi();
   m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupF()), 
     rxbuf[5]);
   //ThisThread::sleep_for(1);
@@ -188,8 +176,6 @@ the devices are free.*/
     }
     cellCursor = 0;
   }
-
-  //return voltages;
 }
 
 uint16_t *LTC6813::getGpio() {

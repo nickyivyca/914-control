@@ -34,7 +34,6 @@ class BMSThread {
   uint16_t voltages[NUM_CHIPS][18];
   uint16_t allVoltages[NUM_CHIPS * NUM_CELLS_PER_CHIP];
 
-
   void throwBmsFault() {
     //m_discharging = false;
     //bmsFault->write(0);
@@ -42,7 +41,6 @@ class BMSThread {
 
   }
   void threadWorker() {
-    //auto allTemps = std::array<tl::optional<int8_t>, BMS_BANK_COUNT * BMS_BANK_CELL_COUNT>();
     uint16_t averageVoltage = -1;
     uint16_t prevMinVoltage = -1;
 
@@ -70,16 +68,8 @@ class BMSThread {
       //ThisThread::sleep_for(400);
       // Turn off status LED
       conf.gpio4 = LTC6813::GPIOOutputState::kHigh;
-      //m_bus->wakeupChainSpi();
-      m_chip->updateConfig();
-
-      /*ThisThread::sleep_for(400);
-
-      // Turn off status LED
-      conf.gpio4 = LTC6813::GPIOOutputState::kHigh;
       m_bus->wakeupChainSpi();
       m_chip->updateConfig();
-      m_chip->readConfig();*/
 
       // Done with communication at this point
       // Now time to crunch numbers
