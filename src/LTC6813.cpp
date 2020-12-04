@@ -109,46 +109,17 @@ void LTC6813::readConfig() {
 void LTC6813::getVoltages(uint16_t voltages[NUM_CHIPS][18]) {
   //Timer t;
   //t.start();
-  m_bus.sendCommandNoRelease(LTC681xBus::buildBroadcastCommand
+  m_bus.sendCommandPollADC(LTC681xBus::buildBroadcastCommand
     (StartCellVoltageADC(AdcMode::k7k, false, CellSelection::kAll)));
-
-  /* 6813 datasheet Page 58
-  If the bottom device communicates in isoSPI mode,
-isoSPI data pulses are sent to the device to update the 
-conversion status. Using LTC6820, this can be achieved
-by just clocking its SCK pin. The conversion status is
-valid only after the bottom LTC6813-1 device receives N
-isoSPI data pulses and the status gets updated for every
-isoSPI data pulse that follows. The device returns a low
-data pulse if any of the devices in the stack is busy performing 
-conversions and returns a high data pulse if all
-the devices are free.*/
-  static constexpr char allones = 0xff;
-  // Clock the pin 
-  // Can only write in blocks of 8 not NUM_CHIPS so this will work until more than 24 chips are on the bus
-  m_bus.m_spiDriver->write(&allones, 1, NULL, 0);
-  m_bus.m_spiDriver->write(&allones, 1, NULL, 0);
-  m_bus.m_spiDriver->write(&allones, 1, NULL, 0);
-  //serial->printf("Wrote 3x allones, checking now\n");
-  char checkbuf = 0;
-  for (unsigned int i = 0; i < 200; i++) {
-    m_bus.m_spiDriver->write(&allones, 1, &checkbuf, 1);
-    //std::bitset<8> c(checkbuf);    
-    //std::cout << i << ": " << c << '\n';
-    if (checkbuf) {
-      break;
-    }
-  }
-  m_bus.releaseSpi();
   //t.stop();
 
   //std::cout << t.read_ms() << '\n';
-  //std::cout << t.read_us() << '\n';
+  //std::cout << "Voltage: " << t.read_us() << '\n';
 
   // [6 voltage groups][each chip in chain][Register of 6 Bytes + PEC]
   uint8_t rxbuf[6][NUM_CHIPS][8];
 
-  m_bus.wakeupChainSpi();
+  //m_bus.wakeupChainSpi();
   m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupA()), 
     rxbuf[0]);
   m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupB()), 
@@ -178,33 +149,39 @@ the devices are free.*/
   }
 }
 
-uint16_t *LTC6813::getGpio() {
-  // TODO: update this based on making getVoltages work
-  auto cmd = StartGpioADC(AdcMode::k7k, GpioSelection::kAll);
-  m_bus.sendCommand(LTC681xBus::buildBroadcastCommand(cmd));
+void LTC6813::getGpio(uint16_t voltages[NUM_CHIPS][9]) {
+  //Timer t;
+  //t.start();
+  m_bus.sendCommandPollADC(LTC681xBus::buildBroadcastCommand
+    (StartGpioADC(AdcMode::k7k, GpioSelection::kAll)));
+  //t.stop();
+  //std::cout << t.read_us() << "us" << '\n';
+  //ThisThread::sleep_for(20);
 
-  // Wait 15 ms for ADC to finish
-  ThisThread::sleep_for(5); // TODO: This could be done differently
+  // [4 aux voltage groups][each chip in chain][Register of 6 Bytes + PEC]
+  uint8_t rxbuf[4][NUM_CHIPS][8];
 
-  uint8_t rxbuf[8 * 2];
+  m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadAuxiliaryGroupA()), 
+    rxbuf[0]);
+  m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadAuxiliaryGroupB()), 
+    rxbuf[1]);
+  m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadAuxiliaryGroupC()), 
+    rxbuf[2]);
+  m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadAuxiliaryGroupD()), 
+    rxbuf[3]);
 
-  //m_bus.readCommand(LTC681xBus::buildAddressedCommand(m_id, ReadAuxiliaryGroupA()), rxbuf);
-  //m_bus.readCommand(LTC681xBus::buildAddressedCommand(m_id, ReadAuxiliaryGroupB()), rxbuf + 8);
+  uint8_t measCursor = 0;
 
-  uint16_t *voltages = new uint16_t[5];
-
-  for (unsigned int i = 0; i < sizeof(rxbuf); i++) {
-    // Skip over PEC
-    if (i % 8 == 6 || i % 8 == 7) continue;
-
-    // Skip over odd bytes
-    if (i % 2 == 1) continue;
-
-    // Wack shit to skip over PEC
-    voltages[(i / 2) - (i / 8)] = ((uint16_t)rxbuf[i]) | ((uint16_t)rxbuf[i + 1] << 8);
+  for (unsigned int k = 0; k < NUM_CHIPS; k++) { // iterate over each chip's worth of data
+    for (unsigned int j = 0; j < 4; j++) { // iterate through each measurement voltage group
+      for (unsigned int i = 0; i < 6; i+= 2) {
+        voltages[k][measCursor] = ((uint16_t)rxbuf[j][k][i]) | ((uint16_t)rxbuf[j][k][i + 1] << 8);
+        //std::cout << (int)measCursor << ": " << voltages[k][measCursor] << '\n';
+        measCursor++;
+      }
+    }
+    measCursor = 0;
   }
-
-  return voltages;
 }
 
 uint16_t *LTC6813::getGpioPin(GpioSelection pin) {

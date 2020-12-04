@@ -55,7 +55,8 @@ void LTC681xBus::wakeupChainSpi() {
   // Twake: 400us
   // Pulse IsoSPI the number of chips, with delay for Twake in between each
   for (unsigned int i = 0; i < NUM_CHIPS; i++) {
-    ThisThread::sleep_for(1);
+    //ThisThread::sleep_for(1);
+    wait_us(420);
     wakeupSpi();
     // Threads can't delay for microseconds it seems?
 #ifdef DEBUGN
@@ -76,6 +77,7 @@ void LTC681xBus::send(uint8_t txCmd[2]) {
   }
 #endif
 
+  wakeupSpi();
   acquireSpi();
   m_spiDriver->write((const char *)cmd, 4, NULL, 0);
   releaseSpi();
@@ -104,6 +106,7 @@ void LTC681xBus::sendData(uint8_t txCmd[2], uint8_t txData[6]) {
   }
 #endif
 
+  wakeupSpi();
   acquireSpi();
   m_spiDriver->write((const char *)cmd, 4, NULL, 0);
   m_spiDriver->write((const char *)data, 8, NULL, 0);
@@ -111,20 +114,62 @@ void LTC681xBus::sendData(uint8_t txCmd[2], uint8_t txData[6]) {
 }
 
 void LTC681xBus::sendCommand(Command txCmd) {
-  sendCommandNoRelease(txCmd);
-  releaseSpi();
-}
-void LTC681xBus::sendCommandNoRelease(Command txCmd) {
   uint8_t cmdCode[2] = {(uint8_t)(txCmd.value >> 8), (uint8_t)(txCmd.value)};
   uint16_t cmdPec = calculatePec(2, cmdCode);
   uint8_t cmd[4] = {cmdCode[0], cmdCode[1],
                     (uint8_t)(cmdPec >> 8),
                     (uint8_t)(cmdPec)};
 
-  //wakeupSpi();
+  wakeupSpi();
   acquireSpi();
   m_spiDriver->write((const char *)cmd, 4, NULL, 0);
-  //releaseSpi();
+  releaseSpi();
+}
+void LTC681xBus::sendCommandPollADC(Command txCmd) {
+  uint8_t cmdCode[2] = {(uint8_t)(txCmd.value >> 8), (uint8_t)(txCmd.value)};
+  uint16_t cmdPec = calculatePec(2, cmdCode);
+  uint8_t cmd[4] = {cmdCode[0], cmdCode[1],
+                    (uint8_t)(cmdPec >> 8),
+                    (uint8_t)(cmdPec)};
+
+
+  /*for (int i = 0; i < 2; i++) {
+    std::bitset<8> c(cmd[i]);
+    std::cout << "CMD: " << c << '\n';
+    //serial->printf("CMD: %d: 0x%x\r\n", i, cmd[i]);
+  }*/  
+  wakeupSpi();
+  acquireSpi();
+  m_spiDriver->write((const char *)cmd, 4, NULL, 0);
+
+  /* 6813 datasheet Page 58
+  If the bottom device communicates in isoSPI mode,
+isoSPI data pulses are sent to the device to update the 
+conversion status. Using LTC6820, this can be achieved
+by just clocking its SCK pin. The conversion status is
+valid only after the bottom LTC6813-1 device receives N
+isoSPI data pulses and the status gets updated for every
+isoSPI data pulse that follows. The device returns a low
+data pulse if any of the devices in the stack is busy performing 
+conversions and returns a high data pulse if all
+the devices are free.*/
+  static constexpr char allones = 0xff;
+  // Clock the pin 
+  // Can only write in blocks of 8 not NUM_CHIPS so this will work until more than 24 chips are on the bus
+  m_spiDriver->write(&allones, 1, NULL, 0);
+  m_spiDriver->write(&allones, 1, NULL, 0);
+  m_spiDriver->write(&allones, 1, NULL, 0);
+  //serial->printf("Wrote 3x allones, checking now\n");
+  char checkbuf = 0;
+  for (unsigned int i = 0; i < 200; i++) {
+    m_spiDriver->write(&allones, 1, &checkbuf, 1);
+    //std::bitset<8> c(checkbuf);    
+    //std::cout << i << ": " << c << '\n';
+    if (checkbuf) {
+      break;
+    }
+  }
+  releaseSpi();
 }
 
 void LTC681xBus::sendCommandWithData(Command txCmd, uint8_t txData[6]) {
@@ -156,7 +201,7 @@ void LTC681xBus::sendCommandWithData(Command txCmd, uint8_t txData[6]) {
   serial->printf("pec: 0x%x\r\n", dataPec);
 #endif*/
 
-  //wakeupSpi();
+  wakeupSpi();
   acquireSpi();
   m_spiDriver->write((const char *)cmd, 4, NULL, 0);
   m_spiDriver->write((const char *)data, 8, NULL, 0);
@@ -177,7 +222,7 @@ void LTC681xBus::readCommand(Command txCmd, uint8_t *rxbuf) {
   }
 #endif
 
-  //wakeupSpi();
+  wakeupSpi();
   acquireSpi();
   m_spiDriver->write((const char *)cmd, 4, NULL, 0);
   m_spiDriver->write(NULL, 0, (char *)rxbuf, 8);
@@ -213,7 +258,7 @@ void LTC681xBus::readWholeChainCommand(Command txCmd, uint8_t rxbuf[NUM_CHIPS][8
   }
 #endif
 
-  //wakeupSpi();
+  wakeupSpi();
   acquireSpi();
   m_spiDriver->write((const char *)cmd, 4, NULL, 0);
   for (int i = 0; i < NUM_CHIPS; i++) {

@@ -80,7 +80,7 @@ class LTC6813 {
   void readConfig();
 
   void getVoltages(uint16_t voltages[NUM_CHIPS][18]);
-  uint16_t *getGpio();
+  void getGpio(uint16_t voltages[NUM_CHIPS][9]);
   uint16_t *getGpioPin(GpioSelection pin);
 
  private:

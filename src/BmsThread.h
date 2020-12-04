@@ -4,6 +4,7 @@
 #include <initializer_list>
 #include <vector>
 #include <algorithm>
+#include <iostream>
 
 #include "mbed.h"
 #include "rtos.h"
@@ -32,7 +33,14 @@ class BMSThread {
   LTC6813* m_chip;
   bool m_discharging = false;
   uint16_t voltages[NUM_CHIPS][18];
+  uint16_t gpio_adc[NUM_CHIPS][9];
   uint16_t allVoltages[NUM_CHIPS * NUM_CELLS_PER_CHIP];
+
+  enum state {INIT, RUN, FAULT};
+
+  state currentState = INIT;
+  state nextState = INIT; 
+
 
   void throwBmsFault() {
     //m_discharging = false;
@@ -54,21 +62,36 @@ class BMSThread {
       int8_t minTemp = INT8_MAX;
       int8_t maxTemp = INT8_MIN;
 
+      /*switch(currentState) {
+        case INIT:
+          // run open wire checks, etc
+          // zero current sensor?
+
+          nextState = currentState;
+          break;
+        case RUN:
+
+      }*/
+
       // Get a reference to the config for toggling gpio
       LTC6813::Configuration& conf = m_chip->getConfig();
 
       // Turn on status LED
       conf.gpio4 = LTC6813::GPIOOutputState::kLow;
-      m_bus->wakeupChainSpi();
+      conf.referencePowerOff = LTC6813::ReferencePowerOff::kWatchdogTimeout;
+      //m_bus->wakeupChainSpi();
       m_chip->updateConfig();
       //m_chip->readConfig();
 
       m_chip->getVoltages(voltages);
+      m_chip->getGpio(gpio_adc);
+      //std::cout << "Current raw: " << gpio_adc[0][2] << '\n';
 
       //ThisThread::sleep_for(400);
       // Turn off status LED
       conf.gpio4 = LTC6813::GPIOOutputState::kHigh;
-      m_bus->wakeupChainSpi();
+      //conf.referencePowerOff = LTC6813::ReferencePowerOff::kAfterConversions;
+      //m_bus->wakeupChainSpi();
       m_chip->updateConfig();
 
       // Done with communication at this point
@@ -126,6 +149,9 @@ class BMSThread {
           }
         }
         serial->printf("\n");
+        // replace 2.497 with zero'd value from startup?
+        float current = 50.0 * (gpio_adc[i][2]/10000.0 - 2.497) / 0.625;
+        std::cout << "Current calculated: " << current/5 << '\n';
       }
 
 
