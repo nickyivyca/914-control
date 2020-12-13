@@ -77,7 +77,7 @@ void LTC681xBus::send(uint8_t txCmd[2]) {
   }
 #endif
 
-  wakeupSpi();
+//  wakeupSpi();
   acquireSpi();
   m_spiDriver->write((const char *)cmd, 4, NULL, 0);
   releaseSpi();
@@ -106,7 +106,7 @@ void LTC681xBus::sendData(uint8_t txCmd[2], uint8_t txData[6]) {
   }
 #endif
 
-  wakeupSpi();
+//  wakeupSpi();
   acquireSpi();
   m_spiDriver->write((const char *)cmd, 4, NULL, 0);
   m_spiDriver->write((const char *)data, 8, NULL, 0);
@@ -120,7 +120,7 @@ void LTC681xBus::sendCommand(Command txCmd) {
                     (uint8_t)(cmdPec >> 8),
                     (uint8_t)(cmdPec)};
 
-  wakeupSpi();
+//  wakeupSpi();
   acquireSpi();
   m_spiDriver->write((const char *)cmd, 4, NULL, 0);
   releaseSpi();
@@ -138,7 +138,7 @@ void LTC681xBus::sendCommandPollADC(Command txCmd) {
     std::cout << "CMD: " << c << '\n';
     //serial->printf("CMD: %d: 0x%x\r\n", i, cmd[i]);
   }*/  
-  wakeupSpi();
+//  wakeupSpi();
   acquireSpi();
   m_spiDriver->write((const char *)cmd, 4, NULL, 0);
 
@@ -201,9 +201,10 @@ void LTC681xBus::sendCommandWithData(Command txCmd, uint8_t txData[6]) {
   serial->printf("pec: 0x%x\r\n", dataPec);
 #endif*/
 
-  wakeupSpi();
+//  wakeupSpi();
   acquireSpi();
   m_spiDriver->write((const char *)cmd, 4, NULL, 0);
+  m_spiDriver->write((const char *)data, 8, NULL, 0);
   m_spiDriver->write((const char *)data, 8, NULL, 0);
   releaseSpi();
 }
@@ -222,7 +223,7 @@ void LTC681xBus::readCommand(Command txCmd, uint8_t *rxbuf) {
   }
 #endif
 
-  wakeupSpi();
+//  wakeupSpi();
   acquireSpi();
   m_spiDriver->write((const char *)cmd, 4, NULL, 0);
   m_spiDriver->write(NULL, 0, (char *)rxbuf, 8);
@@ -258,7 +259,7 @@ void LTC681xBus::readWholeChainCommand(Command txCmd, uint8_t rxbuf[NUM_CHIPS][8
   }
 #endif
 
-  wakeupSpi();
+//  wakeupSpi();
   acquireSpi();
   m_spiDriver->write((const char *)cmd, 4, NULL, 0);
   for (int i = 0; i < NUM_CHIPS; i++) {

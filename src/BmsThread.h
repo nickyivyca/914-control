@@ -79,19 +79,25 @@ class BMSThread {
       // Turn on status LED
       conf.gpio4 = LTC6813::GPIOOutputState::kLow;
       conf.referencePowerOff = LTC6813::ReferencePowerOff::kWatchdogTimeout;
-      //m_bus->wakeupChainSpi();
+      m_bus->wakeupChainSpi();
       m_chip->updateConfig();
       //m_chip->readConfig();
 
+      m_bus->wakeupChainSpi();
+      //std::cout << "Getting voltages\n";
       m_chip->getVoltages(voltages);
+      m_bus->wakeupChainSpi();
+      //std::cout << "Getting GPIOs\n";
       m_chip->getGpio(gpio_adc);
       //std::cout << "Current raw: " << gpio_adc[0][2] << '\n';
+      std::cout << "NTC raw: " << gpio_adc[0][0] << ' ' << gpio_adc[0][1]  << '\n';
 
       //ThisThread::sleep_for(400);
       // Turn off status LED
       conf.gpio4 = LTC6813::GPIOOutputState::kHigh;
+      
       //conf.referencePowerOff = LTC6813::ReferencePowerOff::kAfterConversions;
-      //m_bus->wakeupChainSpi();
+      m_bus->wakeupChainSpi();
       m_chip->updateConfig();
 
       // Done with communication at this point
@@ -149,9 +155,11 @@ class BMSThread {
           }
         }
         serial->printf("\n");
-        // replace 2.497 with zero'd value from startup?
-        float current = 50.0 * (gpio_adc[i][2]/10000.0 - 2.497) / 0.625;
-        std::cout << "Current calculated: " << current/5 << '\n';
+        if (!(i % 2)) {
+          // replace 2.497 with zero'd value from startup?
+          float current = 50.0 * (gpio_adc[i][2]/10000.0 - 2.497) / 0.625;
+          std::cout << "Current calculated: " << current/5 << '\n';
+        }
       }
 
 
