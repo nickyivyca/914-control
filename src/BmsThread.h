@@ -57,6 +57,8 @@ class BMSThread {
     uint16_t averageVoltage = -1;
     uint16_t prevMinVoltage = -1;
 
+    uint8_t balance_index = 0;
+
     while (true) {
       //systime_t timeStart = chVTGetSystemTime();
       // Should be changed to ticker
@@ -66,8 +68,6 @@ class BMSThread {
       uint16_t maxVoltage = 0x0000;
       int8_t minTemp = INT8_MAX;
       int8_t maxTemp = INT8_MIN;
-
-      uint8_t balance_index = 0;
 
       /*switch(currentState) {
         case INIT:
@@ -85,6 +85,22 @@ class BMSThread {
         // Turn on status LED
         conf.gpio4 = LTC6813::GPIOOutputState::kLow;
         conf.referencePowerOff = LTC6813::ReferencePowerOff::kWatchdogTimeout;
+
+        unsigned int index = BMS_CELL_MAP[balance_index];
+        /*if (index != -1) {
+          conf.dischargeState.value |= (1 << balance_index);
+        }*/
+        conf.dischargeState.value |= (1 << balance_index);
+        if (balance_index) {
+          conf.dischargeState.value |= (0 << balance_index-1);
+        } else {
+          conf.dischargeState.value |= (0 << 17);          
+        }
+      }
+      std::cout << "Balance index: " << (int)balance_index << "\n";
+      balance_index++;
+      if (balance_index == 18) {
+        balance_index = 0;
       }
       m_bus->wakeupChainSpi();
       m_6813bus->updateConfig();
