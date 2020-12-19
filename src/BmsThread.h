@@ -67,6 +67,8 @@ class BMSThread {
       int8_t minTemp = INT8_MAX;
       int8_t maxTemp = INT8_MIN;
 
+      uint8_t balance_index = 0;
+
       /*switch(currentState) {
         case INIT:
           // run open wire checks, etc
@@ -100,9 +102,9 @@ class BMSThread {
         // Set power off after conversions?
         //conf.referencePowerOff = LTC6813::ReferencePowerOff::kAfterConversions;
       }
-      std::cout << "NTC raw: " << gpio_adc[0][0] << ' ' << gpio_adc[0][1]  << '\n';
+      //std::cout << "NTC raw: " << gpio_adc[0][0] << ' ' << gpio_adc[0][1]  << '\n';
       
-      m_bus->wakeupChainSpi();
+      //m_bus->wakeupChainSpi();
       m_6813bus->updateConfig();
 
       // Done with communication at this point
@@ -162,10 +164,32 @@ class BMSThread {
           }
         }
         serial->printf("\n");
-        if (!(i % 2)) {
+        // Calculate current sensor
+        if (!(i % 6)) {
           // replace 2.497 with zero'd value from startup?
           float current = 50.0 * (gpio_adc[i][2]/10000.0 - 2.497) / 0.625;
           std::cout << "Current calculated: " << current/5 << '\n';
+        }
+        // Calculate thermistors: present on even chips (lower chip of each box)
+        if (!(i % 2)) {
+          for (uint8_t j = 0; j < 2; j++) {
+            // calculate resistance from voltage
+            float thermvolt = gpio_adc[i][j]/10000.0;
+            float resistance = (4700.0 * thermvolt)/(5.0 - thermvolt);
+            //std::cout << "Calculated resistance " << j+1 << ":  " << resistance << "\n";
+
+            // https://github.com/panStamp/thermistor/blob/master/thermistor.cpp
+            float steinhart;
+            steinhart = resistance / 10000.0;     // (R/Ro)
+            steinhart = log(steinhart);                  // ln(R/Ro)
+            steinhart /= 3380.0;                   // 1/B * ln(R/Ro)
+            steinhart += 1.0 / (25.0 + 273.15); // + (1/To)
+            steinhart = 1.0 / steinhart;                 // Invert
+            steinhart -= 273.15;                         // convert to C
+            steinhart = ceil(steinhart * 10.0) / 10.0;   // round to 1 decimal place
+
+            std::cout << "NTC " << j+1 << ": " << steinhart << '\n';
+          }
         }
       }
       std::cout << '\n';
