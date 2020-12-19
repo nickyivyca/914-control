@@ -209,6 +209,46 @@ void LTC681xBus::sendCommandWithData(Command txCmd, uint8_t txData[6]) {
   releaseSpi();
 }
 
+void LTC681xBus::sendCommandWholeChain(Command txCmd, uint8_t txData[NUM_CHIPS][6]) {
+  uint8_t cmdCode[2] = {(uint8_t)(txCmd.value >> 8), (uint8_t)(txCmd.value)};
+  uint16_t cmdPec = calculatePec(2, cmdCode);
+  uint8_t cmd[4] = {cmdCode[0], cmdCode[1],
+                    (uint8_t)(cmdPec >> 8),
+                    (uint8_t)(cmdPec)};
+
+  uint8_t data[NUM_CHIPS][8];
+  for (int j = 0; j < NUM_CHIPS; j++) {
+    for (int i = 0; i < 6; i++) {
+      data[j][i] = txData[j][i];
+    }
+    uint16_t dataPec = calculatePec(6, txData[j]);
+    data[j][6] = (uint8_t)(dataPec >> 8);
+    data[j][7] = (uint8_t)(dataPec);
+  }
+
+/*#ifdef DEBUGN
+  for (int i = 0; i < 4; i++) {
+    std::bitset<8> c(cmd[i]);
+    std::cout << "CMD: " << c << '\n';
+    //serial->printf("CMD: %d: 0x%x\r\n", i, cmd[i]);
+  }
+  for (int i = 0; i < 8; i++) {
+    std::bitset<8> c(data[i]);
+    std::cout << "Byte: " << i << ' ' << c << '\n';
+    //serial->printf("Byte: %d: 0x%x\r\n", i, data[i]);
+  }
+  serial->printf("pec: 0x%x\r\n", dataPec);
+#endif*/
+
+//  wakeupSpi();
+  acquireSpi();
+  m_spiDriver->write((const char *)cmd, 4, NULL, 0);
+  for (uint8_t i = 0; i < NUM_CHIPS; i++) {
+    m_spiDriver->write((const char *)data[i], 8, NULL, 0);
+  }
+  releaseSpi();
+}
+
 void LTC681xBus::readCommand(Command txCmd, uint8_t *rxbuf) {
   uint8_t cmdCode[2] = {(uint8_t)(txCmd.value >> 8), (uint8_t)(txCmd.value)};
   uint16_t cmdPec = calculatePec(2, cmdCode);

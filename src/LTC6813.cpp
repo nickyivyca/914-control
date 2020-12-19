@@ -11,7 +11,7 @@
 
 #include <DigitalOut.h>
 
-LTC6813::LTC6813(LTC681xBus &bus) : m_bus(bus) {
+LTC6813::LTC6813() {
   m_config =
     Configuration{.gpio9 = GPIOOutputState::kPassive,
                   .gpio8 = GPIOOutputState::kPassive,
@@ -31,30 +31,49 @@ LTC6813::LTC6813(LTC681xBus &bus) : m_bus(bus) {
                   .dischargeTimeout = DischargeTimeoutValue::kDisabled};
 }
 
-void LTC6813::updateConfig() {
+LTC6813::Configuration &LTC6813::getConfig() { return m_config; }
+
+
+
+LTC6813Bus::LTC6813Bus(LTC681xBus &bus) : m_bus(bus) {};
+
+void LTC6813Bus::updateConfig() {
 /*#ifdef DEBUGN
     serial->printf("Updating config\n");
 #endif*/
   // Create configuration data to write
-  uint8_t config[6];
-  config[0] = (uint8_t)m_config.gpio5 << 7
-    | (uint8_t)m_config.gpio4 << 6
-    | (uint8_t)m_config.gpio3 << 5
-    | (uint8_t)m_config.gpio2 << 4
-    | (uint8_t)m_config.gpio1 << 3
-    | (uint8_t)m_config.referencePowerOff << 2
-    | (uint8_t)m_config.dischargeTimerEnabled << 1
-    | (uint8_t)m_config.adcMode;
-  config[1] = m_config.undervoltageComparison & 0xFF;
-  config[2] = ((m_config.undervoltageComparison >> 8) & 0x0F)
-    | (((uint8_t)m_config.overvoltageComparison & 0x0F) << 4);
-  config[3] = (m_config.overvoltageComparison >> 4) & 0xFF;
-  config[4] = m_config.dischargeState.value & 0xFF;
-  config[5] = (((uint8_t)m_config.dischargeTimeout & 0x0F) << 4)
-    | ((m_config.dischargeState.value >> 8) & 0x0F);
+  uint8_t configA[NUM_CHIPS][6];
+  uint8_t configB[NUM_CHIPS][6];
+  for (uint8_t i = 0; i < NUM_CHIPS; i++) {
+    LTC6813::Configuration& conf = m_chips[i].getConfig();
+    configA[i][0] = (uint8_t)conf.gpio5 << 7
+      | (uint8_t)conf.gpio4 << 6
+      | (uint8_t)conf.gpio3 << 5
+      | (uint8_t)conf.gpio2 << 4
+      | (uint8_t)conf.gpio1 << 3
+      | (uint8_t)conf.referencePowerOff << 2
+      | (uint8_t)conf.dischargeTimerEnabled << 1
+      | (uint8_t)conf.adcMode;
+    configA[i][1] = conf.undervoltageComparison & 0xFF;
+    configA[i][2] = ((conf.undervoltageComparison >> 8) & 0x0F)
+      | (((uint8_t)conf.overvoltageComparison & 0x0F) << 4);
+    configA[i][3] = (conf.overvoltageComparison >> 4) & 0xFF;
+    configA[i][4] = conf.dischargeState.value & 0xFF;
+    configA[i][5] = (((uint8_t)conf.dischargeTimeout & 0x0F) << 4)
+      | ((conf.dischargeState.value >> 8) & 0x0F);
 
-  LTC681xBus::Command cmd = LTC681xBus::buildBroadcastCommand(WriteConfigurationGroupA());
-  m_bus.sendCommandWithData(cmd, config);
+  configB[i][0] = ((conf.dischargeState.value >> 8) & 0xF0)
+    | (uint8_t)conf.gpio9 << 3
+    | (uint8_t)conf.gpio8 << 2
+    | (uint8_t)conf.gpio7 << 1
+    | (uint8_t)conf.gpio6;
+  configB[i][1] = conf.forceDigitalRedundancyFailure << 6 // MSB taken up by read only mute bit
+    | conf.redundancyPathSelection << 4
+    | conf.enableDischargeTimerMonitor << 3
+    | conf.DCCGPIO9PullDownEnable << 2
+    | ((conf.dischargeState.value >> 16) & 0x03);
+  // configgroupb[2-5] are read only
+  }
 /*#ifdef DEBUGN
     serial->printf("Sent config A\n");
     for (unsigned int i = 0; i < 6; i++) {
@@ -63,20 +82,11 @@ void LTC6813::updateConfig() {
     }
 #endif*/
 
-  config[0] = ((m_config.dischargeState.value >> 8) & 0xF0)
-    | (uint8_t)m_config.gpio9 << 3
-    | (uint8_t)m_config.gpio8 << 2
-    | (uint8_t)m_config.gpio7 << 1
-    | (uint8_t)m_config.gpio6;
-  config[1] = m_config.forceDigitalRedundancyFailure << 6 // MSB taken up by read only mute bit
-    | m_config.redundancyPathSelection << 4
-    | m_config.enableDischargeTimerMonitor << 3
-    | m_config.DCCGPIO9PullDownEnable << 2
-    | ((m_config.dischargeState.value >> 16) & 0x03);
-  // configgroupb[2-5] are read only
+  LTC681xBus::Command cmd = LTC681xBus::buildBroadcastCommand(WriteConfigurationGroupA());
+  m_bus.sendCommandWholeChain(cmd, configA);
 
   cmd = LTC681xBus::buildBroadcastCommand(WriteConfigurationGroupB());
-  m_bus.sendCommandWithData(cmd, config);
+  m_bus.sendCommandWholeChain(cmd, configB);
 /*#ifdef DEBUGN
     serial->printf("Sent config B\n");
     for (unsigned int i = 0; i < 6; i++) {
@@ -86,9 +96,7 @@ void LTC6813::updateConfig() {
 #endif*/
 }
 
-LTC6813::Configuration &LTC6813::getConfig() { return m_config; }
-
-void LTC6813::readConfig() {
+void LTC6813Bus::readConfig() {
 
   // [6 voltage groups][each chip in chain][Register of 6 Bytes + PEC]
   uint8_t rxbuf[NUM_CHIPS][8];
@@ -106,7 +114,7 @@ void LTC6813::readConfig() {
   //return voltages;
 }
 
-void LTC6813::getVoltages(uint16_t voltages[NUM_CHIPS][18]) {
+void LTC6813Bus::getVoltages(uint16_t voltages[NUM_CHIPS][18]) {
   //Timer t;
   //t.start();
   m_bus.sendCommandPollADC(LTC681xBus::buildBroadcastCommand
@@ -149,7 +157,7 @@ void LTC6813::getVoltages(uint16_t voltages[NUM_CHIPS][18]) {
   }
 }
 
-void LTC6813::getGpio(uint16_t voltages[NUM_CHIPS][9]) {
+void LTC6813Bus::getGpio(uint16_t voltages[NUM_CHIPS][9]) {
   //Timer t;
   //t.start();
   m_bus.sendCommandPollADC(LTC681xBus::buildBroadcastCommand
@@ -184,7 +192,7 @@ void LTC6813::getGpio(uint16_t voltages[NUM_CHIPS][9]) {
   }
 }
 
-uint16_t *LTC6813::getGpioPin(GpioSelection pin) {
+/*uint16_t *LTC6813::getGpioPin(GpioSelection pin) {
   auto cmd = StartGpioADC(AdcMode::k7k, pin);
   m_bus.sendCommand(LTC681xBus::buildBroadcastCommand(cmd));
 
@@ -210,4 +218,5 @@ uint16_t *LTC6813::getGpioPin(GpioSelection pin) {
   }
 
   return voltages;
-}
+};*/
+

@@ -17,9 +17,13 @@ class BMSThread {
  public:
  BMSThread(LTC681xBus* bus, unsigned int frequency) : m_bus(bus) {
     m_delay = 1000 / frequency;
-    m_chip = new LTC6813(*bus);
+    //m_chip = new LTC6813(*bus);
+    m_6813bus = new LTC6813Bus(*bus);
+    /*for (int i = 0; i < NUM_CHIPS; i++) {
+      m_chips.push_back(LTC6813(*bus, i));
+    }*/
     m_bus->wakeupChainSpi();
-    m_chip->updateConfig();
+    m_6813bus->updateConfig();
     m_thread.start(callback(&BMSThread::startThread, this));
   }
   static void startThread(BMSThread *p) {
@@ -30,7 +34,8 @@ class BMSThread {
   Thread m_thread;
   unsigned int m_delay;
   LTC681xBus* m_bus;
-  LTC6813* m_chip;
+  LTC6813Bus* m_6813bus;
+  //std::vector<LTC6813> m_chips;
   bool m_discharging = false;
   uint16_t voltages[NUM_CHIPS][18];
   uint16_t gpio_adc[NUM_CHIPS][9];
@@ -72,33 +77,33 @@ class BMSThread {
         case RUN:
 
       }*/
-
-      // Get a reference to the config for toggling gpio
-      LTC6813::Configuration& conf = m_chip->getConfig();
-
-      // Turn on status LED
-      conf.gpio4 = LTC6813::GPIOOutputState::kLow;
-      conf.referencePowerOff = LTC6813::ReferencePowerOff::kWatchdogTimeout;
+      for (uint8_t i = 0; i < NUM_CHIPS; i++) {
+        // Get a reference to the config for toggling gpio
+        LTC6813::Configuration& conf = m_6813bus->m_chips[i].getConfig();
+        // Turn on status LED
+        conf.gpio4 = LTC6813::GPIOOutputState::kLow;
+        conf.referencePowerOff = LTC6813::ReferencePowerOff::kWatchdogTimeout;
+      }
       m_bus->wakeupChainSpi();
-      m_chip->updateConfig();
-      //m_chip->readConfig();
-
-      m_bus->wakeupChainSpi();
+      m_6813bus->updateConfig();
       //std::cout << "Getting voltages\n";
-      m_chip->getVoltages(voltages);
-      m_bus->wakeupChainSpi();
+      m_6813bus->getVoltages(voltages);
       //std::cout << "Getting GPIOs\n";
-      m_chip->getGpio(gpio_adc);
+      m_6813bus->getGpio(gpio_adc);
       //std::cout << "Current raw: " << gpio_adc[0][2] << '\n';
+      for (uint8_t i = 0; i < NUM_CHIPS; i++) {
+        // Get a reference to the config for toggling gpio
+        LTC6813::Configuration& conf = m_6813bus->m_chips[i].getConfig();
+        //ThisThread::sleep_for(400);
+        // Turn off status LED
+        conf.gpio4 = LTC6813::GPIOOutputState::kHigh;
+        // Set power off after conversions?
+        //conf.referencePowerOff = LTC6813::ReferencePowerOff::kAfterConversions;
+      }
       std::cout << "NTC raw: " << gpio_adc[0][0] << ' ' << gpio_adc[0][1]  << '\n';
-
-      //ThisThread::sleep_for(400);
-      // Turn off status LED
-      conf.gpio4 = LTC6813::GPIOOutputState::kHigh;
       
-      //conf.referencePowerOff = LTC6813::ReferencePowerOff::kAfterConversions;
       m_bus->wakeupChainSpi();
-      m_chip->updateConfig();
+      m_6813bus->updateConfig();
 
       // Done with communication at this point
       // Now time to crunch numbers
@@ -136,6 +141,8 @@ class BMSThread {
             // }
 
             // Discharge cells if enabled
+
+            LTC6813::Configuration& conf = m_6813bus->m_chips[i].getConfig();
             if(m_discharging) {
               if((voltage > prevMinVoltage) && (voltage - prevMinVoltage > BMS_DISCHARGE_THRESHOLD)) {
                 // Discharge
@@ -161,6 +168,7 @@ class BMSThread {
           std::cout << "Current calculated: " << current/5 << '\n';
         }
       }
+      std::cout << '\n';
 
 
       // Turn off status LED

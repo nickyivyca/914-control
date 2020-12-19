@@ -34,15 +34,18 @@ class LTC681xBus {
   void acquireSpi();
   void releaseSpi();
   void wakeupSpi();
-  void wakeupChainSpi();
 
   void send(uint8_t txCmd[2]);
   void sendData(uint8_t txCmd[2], uint8_t txData[6]);
 
   void sendCommand(Command txCmd);
-  void sendCommandPollADC(Command txCmd);
   void sendCommandWithData(Command txCmd, uint8_t data[6]);
   void readCommand(Command txCmd, uint8_t *rxbuf);
+
+
+  void wakeupChainSpi();
+  void sendCommandPollADC(Command txCmd);
+  void sendCommandWholeChain(Command txCmd, uint8_t txData[NUM_CHIPS][6]);
   void readWholeChainCommand(Command txCmd, uint8_t rxbuf[NUM_CHIPS][8]);
 
   SPI *m_spiDriver; //TODO

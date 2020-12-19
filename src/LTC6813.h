@@ -74,16 +74,24 @@ class LTC6813 {
     uint8_t DCCGPIO9PullDownEnable : 1;
   };
 
-  LTC6813(LTC681xBus &bus);
+  LTC6813();
   Configuration &getConfig();
-  void updateConfig();
-  void readConfig();
-
-  void getVoltages(uint16_t voltages[NUM_CHIPS][18]);
-  void getGpio(uint16_t voltages[NUM_CHIPS][9]);
-  uint16_t *getGpioPin(GpioSelection pin);
 
  private:
-  LTC681xBus &m_bus;
+  uint8_t m_id;
   Configuration m_config;
+};
+
+class LTC6813Bus {
+  public:
+    LTC6813 m_chips[NUM_CHIPS];
+    LTC681xBus &m_bus;
+    LTC6813Bus(LTC681xBus &bus);
+    void updateConfig();
+    void readConfig();
+
+    void getVoltages(uint16_t voltages[NUM_CHIPS][18]);
+    void getGpio(uint16_t voltages[NUM_CHIPS][9]);
+    //uint16_t *getGpioPin(GpioSelection pin);
+    //std::vector<LTC6813> m_chips;
 };
