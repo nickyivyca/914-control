@@ -97,7 +97,7 @@ class BMSThread {
           conf.dischargeState.value |= (0 << 17);          
         }
       }
-      std::cout << "Balance index: " << (int)balance_index << "\n";
+      //std::cout << "Balance index: " << (int)balance_index << "\n";
       balance_index++;
       if (balance_index == 18) {
         balance_index = 0;
@@ -181,9 +181,9 @@ class BMSThread {
         }
         serial->printf("\n");
         // Calculate current sensor
-        if (!(i % 6)) {
-          // replace 2.497 with zero'd value from startup?
-          float current = 50.0 * (gpio_adc[i][2]/10000.0 - 2.497) / 0.625;
+        if (!((i-1) % 6)) {
+          // replace 2.497 with zero'd value from startup? maybe use ref
+          float current = 50.0 * (gpio_adc[i][0]/10000.0 - 2.497) / 0.625;
           std::cout << "Current calculated: " << current/5 << '\n';
         }
         // Calculate thermistors: present on even chips (lower chip of each box)
