@@ -35,6 +35,13 @@ enum class GpioSelection : uint8_t {
   k5 = 5,
   kRef = 6
 };
+enum class StatusGroupSelection : uint8_t {
+  kAll = 0,
+  k1 = 1, // SC
+  k2 = 2, // ITMP
+  k3 = 3, // VA
+  k4 = 4  // VD
+};
 
 class WriteConfigurationGroupA : public LTC681xCommand {
   uint16_t toValue() const { return 0x0001; }
@@ -150,5 +157,15 @@ class StartGpioADC : public LTC681xCommand {
   GpioSelection gpioSelection;
   uint16_t toValue() const {
     return 0x0460 | ((uint16_t)adcMode << 7) | ((uint16_t)gpioSelection);
+  }
+};
+// Lost my mind at "Start Overlap Measurement of Cell 7 Voltage"
+class StartStatusADC : public LTC681xCommand {
+ public:
+  StartStatusADC(AdcMode a, StatusGroupSelection s) : adcMode(a), statusSelection(s) {}
+  AdcMode adcMode;
+  StatusGroupSelection statusSelection;
+  uint16_t toValue() const {
+    return 0x0468 | ((uint16_t)adcMode << 7) | ((uint16_t)statusSelection);
   }
 };

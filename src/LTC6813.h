@@ -74,6 +74,16 @@ class LTC6813 {
     uint8_t DCCGPIO9PullDownEnable : 1;
   };
 
+  class Status {
+   public:
+    float sumAllCells; // in mV
+    float internalTemperature;
+    float voltageAnalog; // mV
+    float voltageDigital; // mV
+
+    uint8_t thermalShutDown : 1;
+  };
+
   LTC6813();
   Configuration &getConfig();
 
@@ -92,6 +102,7 @@ class LTC6813Bus {
 
     void getVoltages(uint16_t voltages[NUM_CHIPS][18]);
     void getGpio(uint16_t voltages[NUM_CHIPS][9]);
+    void getStatus(LTC6813::Status statuses[NUM_CHIPS]);
     //uint16_t *getGpioPin(GpioSelection pin);
     //std::vector<LTC6813> m_chips;
 };

@@ -192,6 +192,35 @@ void LTC6813Bus::getGpio(uint16_t voltages[NUM_CHIPS][9]) {
   }
 }
 
+void LTC6813Bus::getStatus(LTC6813::Status statuses[NUM_CHIPS]) {
+  //Timer t;
+  //t.start();
+  m_bus.sendCommandPollADC(LTC681xBus::buildBroadcastCommand
+    (StartStatusADC(AdcMode::k7k, StatusGroupSelection::kAll)));
+
+  // [2 status registers][each chip in chain][Register of 6 Bytes + PEC]
+  uint8_t rxbuf[2][NUM_CHIPS][8];
+
+  m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadStatusGroupA()), 
+    rxbuf[0]);
+  m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadStatusGroupB()), 
+    rxbuf[1]);
+
+  for (unsigned int k = 0; k < NUM_CHIPS; k++) { // iterate over each chip's worth of data
+    uint16_t raw_sum = rxbuf[0][k][0] | (rxbuf[0][k][1] << 8);
+    statuses[k].sumAllCells = raw_sum * 30.0 / 10.0;
+    uint16_t raw_temp = rxbuf[0][k][2] | (rxbuf[0][k][3] << 8);
+    statuses[k].internalTemperature = raw_temp * (0.0001)/(0.0076) - 276.0;
+
+    uint16_t raw_va = rxbuf[0][k][4] | (rxbuf[0][k][5] << 8);
+    statuses[k].voltageAnalog = raw_va / 10.0;
+    uint16_t raw_vd = rxbuf[1][k][0] | (rxbuf[1][k][1] << 8);
+    statuses[k].voltageDigital = raw_vd / 10.0;
+
+    statuses[k].thermalShutDown = rxbuf[1][k][5] & 1;
+  }
+}
+
 /*uint16_t *LTC6813::getGpioPin(GpioSelection pin) {
   auto cmd = StartGpioADC(AdcMode::k7k, pin);
   m_bus.sendCommand(LTC681xBus::buildBroadcastCommand(cmd));

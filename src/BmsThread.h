@@ -65,9 +65,14 @@ class BMSThread {
 
       uint32_t allBanksVoltage = 0;
       uint16_t minVoltage = 0xFFFF;
+      uint8_t minVoltage_cell = 255;
       uint16_t maxVoltage = 0x0000;
-      int8_t minTemp = INT8_MAX;
-      int8_t maxTemp = INT8_MIN;
+      uint8_t maxVoltage_cell = 255;
+      float minTemp = std::numeric_limits<float>::max();
+      uint8_t minTemp_box = 255;
+      float maxTemp = std::numeric_limits<float>::min();
+      uint8_t maxTemp_box = 255;
+      unsigned int totalVoltage = 0;
 
       /*switch(currentState) {
         case INIT:
@@ -108,6 +113,12 @@ class BMSThread {
       m_6813bus->getVoltages(voltages);
       //std::cout << "Getting GPIOs\n";
       m_6813bus->getGpio(gpio_adc);
+
+      LTC6813::Status statuses[NUM_CHIPS];
+      m_6813bus->getStatus(statuses);
+
+
+
       //std::cout << "Current raw: " << gpio_adc[0][2] << '\n';
       for (uint8_t i = 0; i < NUM_CHIPS; i++) {
         // Get a reference to the config for toggling gpio
@@ -130,9 +141,16 @@ class BMSThread {
 
         //serial->printf("Chip %d:\n", i);
 
+        /*std::cout << "Sum: " << statuses[i].sumAllCells
+        << "\nInternal Temp: " << statuses[i].internalTemperature
+        << "\nAnalog Reference: " << statuses[i].voltageAnalog
+        << "\nDigital Reference: " << statuses[i].voltageDigital
+        << "\n";*/
+        totalVoltage += statuses[i].sumAllCells;
+
+
         // Process voltages
-        unsigned int totalVoltage = 0;
-        serial->printf("Voltages: ");
+        //serial->printf("Voltages: ");
         for (int j = 0; j < 18; j++) {
           uint16_t voltage = voltages[i][j] / 10;
 
@@ -141,11 +159,16 @@ class BMSThread {
           if (index != -1) {
             //allVoltages[(BMS_BANK_CELL_COUNT * i) + index] = voltage;
 
-            if (voltage < minVoltage && voltage != 0) minVoltage = voltage;
-            if (voltage > maxVoltage) maxVoltage = voltage;
-
-            totalVoltage += voltage;
-            serial->printf("%dmV ", voltage);
+            if (voltage < minVoltage && voltage != 0) {
+              minVoltage = voltage;
+              minVoltage_cell = index + 14*i;
+            }
+            if (voltage > maxVoltage) {
+              maxVoltage = voltage;
+              maxVoltage_cell = index + 14*i;
+            }
+            //totalVoltage += voltage;
+            //serial->printf("%dmV ", voltage);
 
             // if (voltage >= BMS_FAULT_VOLTAGE_THRESHOLD_HIGH) {
             //   // Set fault line
@@ -179,12 +202,12 @@ class BMSThread {
             }
           }
         }
-        serial->printf("\n");
+        //serial->printf("\n");
         // Calculate current sensor
         if (!((i-1) % 6)) {
           // replace 2.497 with zero'd value from startup? maybe use ref
           float current = 50.0 * (gpio_adc[i][0]/10000.0 - 2.497) / 0.625;
-          std::cout << "Current calculated: " << current/5 << '\n';
+          std::cout << "Current: " << current/5 << '\n';
         }
         // Calculate thermistors: present on even chips (lower chip of each box)
         if (!(i % 2)) {
@@ -204,10 +227,27 @@ class BMSThread {
             steinhart -= 273.15;                         // convert to C
             steinhart = ceil(steinhart * 10.0) / 10.0;   // round to 1 decimal place
 
-            std::cout << "NTC " << j+1 << ": " << steinhart << '\n';
+            if (!isnan(steinhart)) {
+              //std::cout << "NTC " << j+1 << ": " << steinhart << '\n';
+              if (steinhart < minTemp && steinhart != 0){
+                minTemp = steinhart;
+                minTemp_box = j + i;
+              }
+              if (steinhart > maxTemp) {
+                maxTemp = steinhart;
+                maxTemp_box = j + i;
+              }
+            }
+
           }
         }
       }
+      std::cout << "Pack Voltage: " << ((float)totalVoltage)/1000.0
+      << "\nMax Cell: " << maxVoltage << " " << (char)(65+(maxVoltage_cell/28)) << (maxVoltage_cell%28)+1
+      << "\nMin Cell: " << minVoltage << " " << (char)(65+(minVoltage_cell/28)) << (minVoltage_cell%28)+1
+      << "\nMax Temp: " << maxTemp << " " << (char)(65+(maxTemp_box/2)) << (maxTemp_box%2)+1
+      << "\nMin Temp: " << minTemp << " " << (char)(65+(minTemp_box/2)) << (minTemp_box%2)+1;
+      std::cout << '\n';
       std::cout << '\n';
 
 
