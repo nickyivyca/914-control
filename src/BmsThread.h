@@ -59,6 +59,8 @@ class BMSThread {
 
     uint8_t balance_index = 0;
 
+    float current_zero = 2.5;
+
     while (true) {
       //systime_t timeStart = chVTGetSystemTime();
       // Should be changed to ticker
@@ -73,6 +75,7 @@ class BMSThread {
       float maxTemp = std::numeric_limits<float>::min();
       uint8_t maxTemp_box = 255;
       unsigned int totalVoltage = 0;
+      float totalCurrent = 0;
 
       /*switch(currentState) {
         case INIT:
@@ -206,8 +209,9 @@ class BMSThread {
         // Calculate current sensor
         if (!((i-1) % 6)) {
           // replace 2.497 with zero'd value from startup? maybe use ref
-          float current = 50.0 * (gpio_adc[i][0]/10000.0 - 2.497) / 0.625;
-          std::cout << "Current: " << current/5 << '\n';
+          float current = (50.0 * (gpio_adc[i][0]/10000.0 - 2.497) / 0.625); // unit A
+          totalCurrent += current/5; 
+          //std::cout << "Current: " << current << '\n';
         }
         // Calculate thermistors: present on even chips (lower chip of each box)
         if (!(i % 2)) {
@@ -242,11 +246,16 @@ class BMSThread {
           }
         }
       }
-      std::cout << "Pack Voltage: " << ((float)totalVoltage)/1000.0
-      << "\nMax Cell: " << maxVoltage << " " << (char)(65+(maxVoltage_cell/28)) << (maxVoltage_cell%28)+1
-      << "\nMin Cell: " << minVoltage << " " << (char)(65+(minVoltage_cell/28)) << (minVoltage_cell%28)+1
-      << "\nMax Temp: " << maxTemp << " " << (char)(65+(maxTemp_box/2)) << (maxTemp_box%2)+1
-      << "\nMin Temp: " << minTemp << " " << (char)(65+(minTemp_box/2)) << (minTemp_box%2)+1;
+
+      float totalVoltage_scaled = ((float)totalVoltage)/1000.0;
+
+      std::cout << "Pack Voltage: " << ceil(totalVoltage_scaled * 10.0) / 10.0 << "V"  // round to 1 decimal place
+      << " Current: " << totalCurrent << "A"
+      << "\nPower: " << ceil(totalCurrent * (totalVoltage_scaled * 10.0) / 1000.0) / 10.0 << "kW"  // round to 1 decimal place, scale to kW
+      << "\nMax Cell: " << maxVoltage << " " << (char)('A'+(maxVoltage_cell/28)) << (maxVoltage_cell%28)+1
+      << " Min Cell: " << minVoltage << " " << (char)('A'+(minVoltage_cell/28)) << (minVoltage_cell%28)+1
+      << "\nMax Temp: " << maxTemp << " " << (char)('A'+(maxTemp_box/2)) << (maxTemp_box%2)+1
+      << " Min Temp: " << minTemp << " " << (char)('A'+(minTemp_box/2)) << (minTemp_box%2)+1;
       std::cout << '\n';
       std::cout << '\n';
 
