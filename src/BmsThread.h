@@ -40,6 +40,7 @@ class BMSThread {
   uint16_t voltages[NUM_CHIPS][18];
   uint16_t gpio_adc[NUM_CHIPS][9];
   uint16_t allVoltages[NUM_CHIPS * NUM_CELLS_PER_CHIP];
+  float allTemperatures[NUM_CHIPS * NUM_CELLS_PER_CHIP];
 
   enum state {INIT, RUN, FAULT};
 
@@ -75,7 +76,7 @@ class BMSThread {
       float maxTemp = std::numeric_limits<float>::min();
       uint8_t maxTemp_box = 255;
       unsigned int totalVoltage = 0;
-      float totalCurrent = 0;
+      int totalCurrent = 0;
 
       /*switch(currentState) {
         case INIT:
@@ -209,7 +210,7 @@ class BMSThread {
         // Calculate current sensor
         if (!((i-1) % 6)) {
           // replace 2.497 with zero'd value from startup? maybe use ref
-          float current = (50.0 * (gpio_adc[i][0]/10000.0 - 2.497) / 0.625); // unit A
+          int current = (50.0 * (gpio_adc[i][0]/10000.0 - 2.497) / 0.625) * 1000.0; // unit mA
           totalCurrent += current/5; 
           //std::cout << "Current: " << current << '\n';
         }
@@ -248,10 +249,11 @@ class BMSThread {
       }
 
       float totalVoltage_scaled = ((float)totalVoltage)/1000.0;
+      float totalCurrent_scaled = ((float)totalCurrent)/1000.0;
 
       std::cout << "Pack Voltage: " << ceil(totalVoltage_scaled * 10.0) / 10.0 << "V"  // round to 1 decimal place
-      << " Current: " << totalCurrent << "A"
-      << "\nPower: " << ceil(totalCurrent * (totalVoltage_scaled * 10.0) / 1000.0) / 10.0 << "kW"  // round to 1 decimal place, scale to kW
+      << " Current: " << totalCurrent_scaled << "A"
+      << "\nPower: " << ceil(totalCurrent_scaled * (totalVoltage_scaled * 10.0) / 1000.0) / 10.0 << "kW"  // round to 1 decimal place, scale to kW
       << "\nMax Cell: " << maxVoltage << " " << (char)('A'+(maxVoltage_cell/28)) << (maxVoltage_cell%28)+1
       << " Min Cell: " << minVoltage << " " << (char)('A'+(minVoltage_cell/28)) << (minVoltage_cell%28)+1
       << "\nMax Temp: " << maxTemp << " " << (char)('A'+(maxTemp_box/2)) << (maxTemp_box%2)+1
