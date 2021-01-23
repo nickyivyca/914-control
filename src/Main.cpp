@@ -26,7 +26,7 @@ int main() {
   spiDriver->format(8, 0);
   LTC681xBus ltcBus = LTC681xBus(spiDriver);
 
-  BMSThread bmsThread(&ltcBus, 1);
+  BMSThread bmsThread(&ltcBus, CELL_SENSE_FREQUENCY);
 
   DigitalOut led(LED1);
   // Flash LEDs to indicate startup
@@ -77,7 +77,7 @@ int main() {
 
 void initIO() {
   serial = new Serial(USBTX, USBRX);
-  serial->printf("INIT\n");
+  //serial->printf("INIT\n");
   
   canBus = new CAN(PIN_CAN_TX, PIN_CAN_RX, CAN_FREQUENCY);  
 }

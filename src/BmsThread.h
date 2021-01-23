@@ -40,12 +40,12 @@ class BMSThread {
   uint16_t voltages[NUM_CHIPS][18];
   uint16_t gpio_adc[NUM_CHIPS][9];
   uint16_t allVoltages[NUM_CHIPS * NUM_CELLS_PER_CHIP];
-  float allTemperatures[NUM_CHIPS * NUM_CELLS_PER_CHIP];
+  float allTemperatures[NUM_CHIPS];
 
   enum state {INIT, RUN, FAULT};
 
   state currentState = INIT;
-  state nextState = INIT; 
+  state nextState = INIT;
 
 
   void throwBmsFault() {
@@ -61,6 +61,19 @@ class BMSThread {
     uint8_t balance_index = 0;
 
     float current_zero = 2.5;
+
+    std::cout << "time_millis,totalCurrent";
+    for (uint16_t i = 0; i < NUM_CHIPS/2; i++) {
+      for (uint16_t j = 1; j <= NUM_CELLS_PER_CHIP*2; j++) {
+        std::cout << ",V_" << (char)('A'+i) << j;
+      }
+    }
+    for (uint16_t i = 0; i < NUM_CHIPS; i++) {
+      std::cout << ",T_" << (char)('A'+(i/2)) << (i%2)+1;
+    }
+    std::cout << '\n';
+    Timer t;
+    t.start();
 
     while (true) {
       //systime_t timeStart = chVTGetSystemTime();
@@ -95,22 +108,19 @@ class BMSThread {
         conf.gpio4 = LTC6813::GPIOOutputState::kLow;
         conf.referencePowerOff = LTC6813::ReferencePowerOff::kWatchdogTimeout;
 
-        unsigned int index = BMS_CELL_MAP[balance_index];
-        /*if (index != -1) {
-          conf.dischargeState.value |= (1 << balance_index);
-        }*/
+        /*unsigned int index = BMS_CELL_MAP[balance_index];
         conf.dischargeState.value |= (1 << balance_index);
         if (balance_index) {
           conf.dischargeState.value |= (0 << balance_index-1);
         } else {
           conf.dischargeState.value |= (0 << 17);          
-        }
+        }*/
       }
       //std::cout << "Balance index: " << (int)balance_index << "\n";
-      balance_index++;
+      /*balance_index++;
       if (balance_index == 18) {
         balance_index = 0;
-      }
+      }*/
       m_bus->wakeupChainSpi();
       m_6813bus->updateConfig();
       //std::cout << "Getting voltages\n";
@@ -161,7 +171,7 @@ class BMSThread {
 
           unsigned int index = BMS_CELL_MAP[j];
           if (index != -1) {
-            //allVoltages[(BMS_BANK_CELL_COUNT * i) + index] = voltage;
+            allVoltages[(NUM_CELLS_PER_CHIP * i) + index] = voltage;
 
             if (voltage < minVoltage && voltage != 0) {
               minVoltage = voltage;
@@ -232,6 +242,8 @@ class BMSThread {
             steinhart -= 273.15;                         // convert to C
             steinhart = ceil(steinhart * 10.0) / 10.0;   // round to 1 decimal place
 
+            allTemperatures[i+j] = steinhart;
+
             if (!isnan(steinhart)) {
               //std::cout << "NTC " << j+1 << ": " << steinhart << '\n';
               if (steinhart < minTemp && steinhart != 0){
@@ -251,7 +263,7 @@ class BMSThread {
       float totalVoltage_scaled = ((float)totalVoltage)/1000.0;
       float totalCurrent_scaled = ((float)totalCurrent)/1000.0;
 
-      std::cout << "Pack Voltage: " << ceil(totalVoltage_scaled * 10.0) / 10.0 << "V"  // round to 1 decimal place
+      /*std::cout << "Pack Voltage: " << ceil(totalVoltage_scaled * 10.0) / 10.0 << "V"  // round to 1 decimal place
       << " Current: " << totalCurrent_scaled << "A"
       << "\nPower: " << ceil(totalCurrent_scaled * (totalVoltage_scaled * 10.0) / 1000.0) / 10.0 << "kW"  // round to 1 decimal place, scale to kW
       << "\nMax Cell: " << maxVoltage << " " << (char)('A'+(maxVoltage_cell/28)) << (maxVoltage_cell%28)+1
@@ -259,6 +271,15 @@ class BMSThread {
       << "\nMax Temp: " << maxTemp << " " << (char)('A'+(maxTemp_box/2)) << (maxTemp_box%2)+1
       << " Min Temp: " << minTemp << " " << (char)('A'+(minTemp_box/2)) << (minTemp_box%2)+1;
       std::cout << '\n';
+      std::cout << '\n';*/
+
+      std::cout << t.read_ms() << ',' << totalCurrent_scaled;
+      for (uint16_t i = 0; i < NUM_CHIPS * NUM_CELLS_PER_CHIP; i++) {
+        std::cout << ',' << allVoltages[i];
+      }
+      for (uint16_t i = 0; i < NUM_CHIPS; i++) {
+        std::cout << ',' << allTemperatures[i];
+      }
       std::cout << '\n';
 
 
@@ -340,7 +361,8 @@ class BMSThread {
       //serial->printf("BMS Thread time elapsed: %dms\n", timeElapsed);
 #endif
       //ThisThread::sleep_for(m_delay*3);
-      ThisThread::sleep_for(1000);
+
+      ThisThread::sleep_for(m_delay - (t.read_ms()%m_delay));
     }
   }
 };
