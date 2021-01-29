@@ -16,11 +16,11 @@ extern CAN* canBus;
 
 // Number of 6813 chips on isospi bus
 #ifndef NUM_CHIPS
-#define NUM_CHIPS 4
+#define NUM_CHIPS 6
 #endif
 
 #ifndef CELL_SENSE_FREQUENCY
-#define CELL_SENSE_FREQUENCY 10
+#define CELL_SENSE_FREQUENCY 1
 #endif
 
 /*#ifndef DEBUGN

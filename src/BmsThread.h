@@ -153,7 +153,7 @@ class BMSThread {
 
       for (unsigned int i = 0; i < NUM_CHIPS; i++) {
 
-        //serial->printf("Chip %d:\n", i);
+        serial->printf("Chip %d:\n", i);
 
         /*std::cout << "Sum: " << statuses[i].sumAllCells
         << "\nInternal Temp: " << statuses[i].internalTemperature
@@ -164,7 +164,7 @@ class BMSThread {
 
 
         // Process voltages
-        //serial->printf("Voltages: ");
+        serial->printf("Voltages: ");
         for (int j = 0; j < 18; j++) {
           uint16_t voltage = voltages[i][j] / 10;
 
@@ -182,7 +182,7 @@ class BMSThread {
               maxVoltage_cell = index + 14*i;
             }
             //totalVoltage += voltage;
-            //serial->printf("%dmV ", voltage);
+            serial->printf("%dmV ", voltage);
 
             // if (voltage >= BMS_FAULT_VOLTAGE_THRESHOLD_HIGH) {
             //   // Set fault line
@@ -216,7 +216,7 @@ class BMSThread {
             }
           }
         }
-        //serial->printf("\n");
+        serial->printf("\n");
         // Calculate current sensor
         if (!((i-1) % 6)) {
           // replace 2.497 with zero'd value from startup? maybe use ref
@@ -263,7 +263,7 @@ class BMSThread {
       float totalVoltage_scaled = ((float)totalVoltage)/1000.0;
       float totalCurrent_scaled = ((float)totalCurrent)/1000.0;
 
-      /*std::cout << "Pack Voltage: " << ceil(totalVoltage_scaled * 10.0) / 10.0 << "V"  // round to 1 decimal place
+      std::cout << "Pack Voltage: " << ceil(totalVoltage_scaled * 10.0) / 10.0 << "V"  // round to 1 decimal place
       << " Current: " << totalCurrent_scaled << "A"
       << "\nPower: " << ceil(totalCurrent_scaled * (totalVoltage_scaled * 10.0) / 1000.0) / 10.0 << "kW"  // round to 1 decimal place, scale to kW
       << "\nMax Cell: " << maxVoltage << " " << (char)('A'+(maxVoltage_cell/28)) << (maxVoltage_cell%28)+1
@@ -271,16 +271,16 @@ class BMSThread {
       << "\nMax Temp: " << maxTemp << " " << (char)('A'+(maxTemp_box/2)) << (maxTemp_box%2)+1
       << " Min Temp: " << minTemp << " " << (char)('A'+(minTemp_box/2)) << (minTemp_box%2)+1;
       std::cout << '\n';
-      std::cout << '\n';*/
+      std::cout << '\n';
 
-      std::cout << t.read_ms() << ',' << totalCurrent_scaled;
+      /*std::cout << t.read_ms() << ',' << totalCurrent_scaled;
       for (uint16_t i = 0; i < NUM_CHIPS * NUM_CELLS_PER_CHIP; i++) {
         std::cout << ',' << allVoltages[i];
       }
       for (uint16_t i = 0; i < NUM_CHIPS; i++) {
         std::cout << ',' << allTemperatures[i];
       }
-      std::cout << '\n';
+      std::cout << '\n';*/
 
 
       // Turn off status LED
@@ -361,6 +361,8 @@ class BMSThread {
       //serial->printf("BMS Thread time elapsed: %dms\n", timeElapsed);
 #endif
       //ThisThread::sleep_for(m_delay*3);
+
+      //std::cout << "m_delay: " << m_delay << " Delaying for: " << (m_delay - (t.read_ms()%m_delay));
 
       ThisThread::sleep_for(m_delay - (t.read_ms()%m_delay));
     }
