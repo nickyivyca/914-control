@@ -20,7 +20,7 @@ extern CAN* canBus;
 #endif
 
 #ifndef CELL_SENSE_FREQUENCY
-#define CELL_SENSE_FREQUENCY 1
+#define CELL_SENSE_FREQUENCY 50
 #endif
 
 /*#ifndef DEBUGN

@@ -153,7 +153,7 @@ class BMSThread {
 
       for (unsigned int i = 0; i < NUM_CHIPS; i++) {
 
-        serial->printf("Chip %d:\n", i);
+        //serial->printf("Chip %d:\n", i);
 
         /*std::cout << "Sum: " << statuses[i].sumAllCells
         << "\nInternal Temp: " << statuses[i].internalTemperature
@@ -164,7 +164,7 @@ class BMSThread {
 
 
         // Process voltages
-        serial->printf("Voltages: ");
+        //serial->printf("Voltages: ");
         for (int j = 0; j < 18; j++) {
           uint16_t voltage = voltages[i][j] / 10;
 
@@ -182,7 +182,7 @@ class BMSThread {
               maxVoltage_cell = index + 14*i;
             }
             //totalVoltage += voltage;
-            serial->printf("%dmV ", voltage);
+            //serial->printf("%dmV ", voltage);
 
             // if (voltage >= BMS_FAULT_VOLTAGE_THRESHOLD_HIGH) {
             //   // Set fault line
@@ -216,7 +216,7 @@ class BMSThread {
             }
           }
         }
-        serial->printf("\n");
+        //serial->printf("\n");
         // Calculate current sensor
         if (!((i-1) % 6)) {
           // replace 2.497 with zero'd value from startup? maybe use ref
