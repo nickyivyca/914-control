@@ -16,11 +16,15 @@ extern CAN* canBus;
 
 // Number of 6813 chips on isospi bus
 #ifndef NUM_CHIPS
-#define NUM_CHIPS 6
+#define NUM_CHIPS 2
 #endif
 
 #ifndef CELL_SENSE_FREQUENCY
-#define CELL_SENSE_FREQUENCY 50
+#define CELL_SENSE_FREQUENCY 5
+#endif
+
+#ifndef MAIN_PERIOD
+#define MAIN_PERIOD 10
 #endif
 
 /*#ifndef DEBUGN
@@ -33,6 +37,10 @@ extern CAN* canBus;
 #endif
 
 const int BMS_CELL_MAP[18] = {0, 1, 2, 3, 4, -1, 5, 6, 7, 8, 9, -1, 10, 11, 12, 13, -1, -1};
+
+enum thread_message {INIT_ALL, NEW_CELL_DATA, // main
+  BMS_INIT, BMS_READ, ENABLE_BALANCING, DISABLE_BALANCING, // bms thread
+  DATA_INIT, DATA_DATA, DATA_SUMMARY};    // data thread
 
 
 //
@@ -73,7 +81,7 @@ const int BMS_CELL_MAP[18] = {0, 1, 2, 3, 4, -1, 5, 6, 7, 8, 9, -1, 10, 11, 12, 
 //
 // Units: millivolts
 #ifndef BMS_FAULT_VOLTAGE_THRESHOLD_LOW
-#define BMS_FAULT_VOLTAGE_THRESHOLD_LOW 2550
+#define BMS_FAULT_VOLTAGE_THRESHOLD_LOW 3000
 #endif
 
 // Threshold when cells will be discharged when discharging is enabled.

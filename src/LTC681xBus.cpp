@@ -167,6 +167,8 @@ the devices are free.*/
     //std::cout << i << ": " << c << '\n';
     if (checkbuf) {
       break;
+    } else {
+      ThisThread::sleep_for(1);
     }
   }
   releaseSpi();

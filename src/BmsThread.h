@@ -12,18 +12,25 @@
 #include "config.h"
 #include "LTC6813.h"
 #include "LTC681xBus.h"
+#include "Data.h"
 
 class BMSThread {
  public:
- BMSThread(LTC681xBus* bus, unsigned int frequency) : m_bus(bus) {
+ BMSThread(Mail<mail_t, MSG_QUEUE_SIZE>* outbox, Mail<mail_t, MSG_QUEUE_SIZE>* inbox, 
+  LTC681xBus* bus, LTC6813Bus* bus_6813, batterycomm_t* datacomm, unsigned int frequency) : 
+   m_inbox(inbox), m_outbox(outbox), m_bus(bus), m_6813bus(bus_6813) {
     m_delay = 1000 / frequency;
     //m_chip = new LTC6813(*bus);
-    m_6813bus = new LTC6813Bus(*bus);
+    //m_6813bus = new LTC6813Bus(*bus);
     /*for (int i = 0; i < NUM_CHIPS; i++) {
       m_chips.push_back(LTC6813(*bus, i));
     }*/
-    m_bus->wakeupChainSpi();
-    m_6813bus->updateConfig();
+    m_mutex = &datacomm->mutex;
+    m_batterydata = &datacomm->batterydata;
+    m_batterysummary = &datacomm->batterysummary;
+    //m_bus->wakeupChainSpi();
+    //m_6813bus->updateConfig();
+
     m_thread.start(callback(&BMSThread::startThread, this));
   }
   static void startThread(BMSThread *p) {
@@ -31,16 +38,20 @@ class BMSThread {
   }
 
  private:
+  //Thread m_thread(osPriorityHigh, OS_STACK_SIZE*2);
   Thread m_thread;
   unsigned int m_delay;
+  Mail<mail_t, MSG_QUEUE_SIZE>* m_inbox;
+  Mail<mail_t, MSG_QUEUE_SIZE>* m_outbox;
   LTC681xBus* m_bus;
   LTC6813Bus* m_6813bus;
+  Mutex* m_mutex;
+  batterydata_t* m_batterydata;
+  batterysummary_t* m_batterysummary;
   //std::vector<LTC6813> m_chips;
   bool m_discharging = false;
   uint16_t voltages[NUM_CHIPS][18];
   uint16_t gpio_adc[NUM_CHIPS][9];
-  uint16_t allVoltages[NUM_CHIPS * NUM_CELLS_PER_CHIP];
-  float allTemperatures[NUM_CHIPS];
 
   enum state {INIT, RUN, FAULT};
 
@@ -55,10 +66,9 @@ class BMSThread {
 
   }
   void threadWorker() {
-    uint16_t averageVoltage = -1;
-    uint16_t prevMinVoltage = -1;
 
     uint8_t balance_index = 0;
+    uint16_t prevMinVoltage = 0;
 
     float current_zero = 2.5;
 
@@ -76,8 +86,6 @@ class BMSThread {
     t.start();
 
     while (true) {
-      //systime_t timeStart = chVTGetSystemTime();
-      // Should be changed to ticker
 
       uint32_t allBanksVoltage = 0;
       uint16_t minVoltage = 0xFFFF;
@@ -90,6 +98,8 @@ class BMSThread {
       uint8_t maxTemp_box = 255;
       unsigned int totalVoltage = 0;
       int totalCurrent = 0;
+      //systime_t timeStart = chVTGetSystemTime();
+      // Should be changed to ticker
 
       /*switch(currentState) {
         case INIT:
@@ -151,6 +161,8 @@ class BMSThread {
       // Done with communication at this point
       // Now time to crunch numbers
 
+      m_mutex->lock();
+
       for (unsigned int i = 0; i < NUM_CHIPS; i++) {
 
         //serial->printf("Chip %d:\n", i);
@@ -169,9 +181,9 @@ class BMSThread {
           uint16_t voltage = voltages[i][j] / 10;
 
 
-          unsigned int index = BMS_CELL_MAP[j];
+          int index = BMS_CELL_MAP[j];
           if (index != -1) {
-            allVoltages[(NUM_CELLS_PER_CHIP * i) + index] = voltage;
+            m_batterydata->allVoltages[(NUM_CELLS_PER_CHIP * i) + index] = voltage;
 
             if (voltage < minVoltage && voltage != 0) {
               minVoltage = voltage;
@@ -242,9 +254,9 @@ class BMSThread {
             steinhart -= 273.15;                         // convert to C
             steinhart = ceil(steinhart * 10.0) / 10.0;   // round to 1 decimal place
 
-            allTemperatures[i+j] = steinhart;
 
             if (!isnan(steinhart)) {
+              m_batterydata->allTemperatures[i+j] = steinhart;
               //std::cout << "NTC " << j+1 << ": " << steinhart << '\n';
               if (steinhart < minTemp && steinhart != 0){
                 minTemp = steinhart;
@@ -260,7 +272,7 @@ class BMSThread {
         }
       }
 
-      float totalVoltage_scaled = ((float)totalVoltage)/1000.0;
+      /*float totalVoltage_scaled = ((float)totalVoltage)/1000.0;
       float totalCurrent_scaled = ((float)totalCurrent)/1000.0;
 
       std::cout << "Pack Voltage: " << ceil(totalVoltage_scaled * 10.0) / 10.0 << "V"  // round to 1 decimal place
@@ -268,10 +280,40 @@ class BMSThread {
       << "\nPower: " << ceil(totalCurrent_scaled * (totalVoltage_scaled * 10.0) / 1000.0) / 10.0 << "kW"  // round to 1 decimal place, scale to kW
       << "\nMax Cell: " << maxVoltage << " " << (char)('A'+(maxVoltage_cell/28)) << (maxVoltage_cell%28)+1
       << " Min Cell: " << minVoltage << " " << (char)('A'+(minVoltage_cell/28)) << (minVoltage_cell%28)+1
+      << " Avg Cell: " << (totalVoltage_scaled/(NUM_CELLS_PER_CHIP*NUM_CHIPS))
       << "\nMax Temp: " << maxTemp << " " << (char)('A'+(maxTemp_box/2)) << (maxTemp_box%2)+1
       << " Min Temp: " << minTemp << " " << (char)('A'+(minTemp_box/2)) << (minTemp_box%2)+1;
       std::cout << '\n';
-      std::cout << '\n';
+      std::cout << '\n';*/
+
+      m_batterysummary->minVoltage = minVoltage;
+      m_batterysummary->minVoltage_cell = minVoltage_cell;
+      m_batterysummary->maxVoltage = maxVoltage;
+      m_batterysummary->maxVoltage_cell = maxVoltage_cell;
+      m_batterysummary->minTemp = minTemp;
+      m_batterysummary->minTemp_box = minTemp_box;
+      m_batterysummary->maxTemp = maxTemp;
+      m_batterysummary->maxTemp_box = maxTemp_box;
+      m_batterysummary->totalCurrent = totalCurrent;
+      m_batterysummary->totalVoltage = totalVoltage;
+
+      m_mutex->unlock();
+
+      mail_t *msg = m_outbox->alloc();
+      msg->msg_event = NEW_CELL_DATA;
+      m_outbox->put(msg);
+
+
+      /*uint16_t mean = (totalVoltage/(NUM_CELLS_PER_CHIP*NUM_CHIPS));
+      float standardDeviation = 0;
+
+      for(uint8_t i = 0; i < NUM_CELLS_PER_CHIP*NUM_CHIPS; i++) {
+        standardDeviation += pow(allVoltages[i] - mean, 2);
+      }
+
+      std::cout << "CellV Standard deviation: " << sqrt(standardDeviation/(NUM_CELLS_PER_CHIP*NUM_CHIPS)) << '\n';*/
+
+
 
       /*std::cout << t.read_ms() << ',' << totalCurrent_scaled;
       for (uint16_t i = 0; i < NUM_CHIPS * NUM_CELLS_PER_CHIP; i++) {
