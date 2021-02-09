@@ -139,7 +139,7 @@ int main() {
 
 void initIO() {
   serial = new Serial(USBTX, USBRX);
-  //serial->baud(921600);
+  serial->baud(230400);
   //serial->printf("INIT\n");
   
   canBus = new CAN(PIN_CAN_TX, PIN_CAN_RX, CAN_FREQUENCY);

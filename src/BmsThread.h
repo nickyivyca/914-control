@@ -51,7 +51,7 @@ class BMSThread {
   //std::vector<LTC6813> m_chips;
   bool m_discharging = false;
   uint16_t voltages[NUM_CHIPS][18];
-  uint16_t gpio_adc[NUM_CHIPS][9];
+  uint16_t gpio_adc[NUM_CHIPS][2];
 
   enum state {INIT, RUN, FAULT};
 
@@ -85,7 +85,12 @@ class BMSThread {
     Timer t;
     t.start();
 
+    uint32_t prevTime = 0;
+
+
+
     while (true) {
+      uint32_t startTime = t.read_ms();
 
       uint32_t allBanksVoltage = 0;
       uint16_t minVoltage = 0xFFFF;
@@ -133,13 +138,10 @@ class BMSThread {
       }*/
       m_bus->wakeupChainSpi();
       m_6813bus->updateConfig();
-      //std::cout << "Getting voltages\n";
-      m_6813bus->getVoltages(voltages);
-      //std::cout << "Getting GPIOs\n";
-      m_6813bus->getGpio(gpio_adc);
+      m_6813bus->getCombined(voltages, gpio_adc);
 
-      LTC6813::Status statuses[NUM_CHIPS];
-      m_6813bus->getStatus(statuses);
+      /*LTC6813::Status statuses[NUM_CHIPS];
+      m_6813bus->getStatus(statuses);*/
 
 
 
@@ -172,7 +174,7 @@ class BMSThread {
         << "\nAnalog Reference: " << statuses[i].voltageAnalog
         << "\nDigital Reference: " << statuses[i].voltageDigital
         << "\n";*/
-        totalVoltage += statuses[i].sumAllCells;
+        //totalVoltage += statuses[i].sumAllCells;
 
 
         // Process voltages
@@ -184,6 +186,7 @@ class BMSThread {
           int index = BMS_CELL_MAP[j];
           if (index != -1) {
             m_batterydata->allVoltages[(NUM_CELLS_PER_CHIP * i) + index] = voltage;
+            totalVoltage += voltage;
 
             if (voltage < minVoltage && voltage != 0) {
               minVoltage = voltage;
@@ -405,6 +408,10 @@ class BMSThread {
       //ThisThread::sleep_for(m_delay*3);
 
       //std::cout << "m_delay: " << m_delay << " Delaying for: " << (m_delay - (t.read_ms()%m_delay));
+      /*if ((t.read_ms() - startTime) != prevTime) {
+        prevTime = t.read_ms() - startTime;
+        std::cout << "BMS loop time: " << prevTime << "ms\n";
+      }*/
 
       ThisThread::sleep_for(m_delay - (t.read_ms()%m_delay));
     }

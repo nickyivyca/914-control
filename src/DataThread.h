@@ -32,6 +32,10 @@ class DataThread {
     Mutex* m_mutex;
 
     void threadWorker() {
+      Timer t;
+      t.start();
+      uint32_t prevTime = 0;
+
       while (true) {
         if (!m_inbox->empty()) {
           osEvent evt = m_inbox->get();
@@ -41,6 +45,7 @@ class DataThread {
             mail_t *msg = (mail_t *)evt.value.p;
 
 
+            uint32_t startTime = t.read_ms();
             switch(msg->msg_event) {
               case DATA_INIT:
                 std::cout << "Data thread received init\n";
@@ -73,6 +78,10 @@ class DataThread {
             }
 
             m_inbox->free(msg);
+            /*if ((t.read_ms() - startTime) != prevTime) {
+              prevTime = t.read_ms() - startTime;
+              std::cout << "Data loop time: " << prevTime << "ms\n";
+            }*/
           }
         ThisThread::sleep_for(1);
         }

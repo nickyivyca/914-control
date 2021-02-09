@@ -102,6 +102,7 @@ class LTC6813Bus {
 
     void getVoltages(uint16_t voltages[NUM_CHIPS][18]);
     void getGpio(uint16_t voltages[NUM_CHIPS][9]);
+    void getCombined(uint16_t voltages[NUM_CHIPS][18], uint16_t adcVoltages[NUM_CHIPS][2]);
     void getStatus(LTC6813::Status statuses[NUM_CHIPS]);
     //uint16_t *getGpioPin(GpioSelection pin);
     //std::vector<LTC6813> m_chips;

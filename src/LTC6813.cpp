@@ -192,6 +192,59 @@ void LTC6813Bus::getGpio(uint16_t voltages[NUM_CHIPS][9]) {
   }
 }
 
+void LTC6813Bus::getCombined(uint16_t cellVoltages[NUM_CHIPS][18], uint16_t adcVoltages[NUM_CHIPS][2]) {
+  //Timer t;
+  //t.start();
+  m_bus.sendCommandPollADC(LTC681xBus::buildBroadcastCommand(StartCombinedADC(AdcMode::k7k)));
+  //t.stop();
+
+  //std::cout << t.read_ms() << '\n';
+  //std::cout << "Voltage: " << t.read_us() << '\n';
+
+  // [6 voltage groups][each chip in chain][Register of 6 Bytes + PEC]
+  uint8_t rxbuf[7][NUM_CHIPS][8];
+
+  //m_bus.wakeupChainSpi();
+  uint8_t pecStatuses = 0;
+  pecStatuses |= m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupA()), 
+    rxbuf[0]);
+  pecStatuses |= m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupB()), 
+    rxbuf[1])<<1;
+  pecStatuses |= m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupC()), 
+    rxbuf[2])<<2;
+  pecStatuses |= m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupD()), 
+    rxbuf[3])<<3;
+  pecStatuses |= m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupE()), 
+    rxbuf[4])<<4;
+  pecStatuses |= m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupF()), 
+    rxbuf[5])<<5;
+  pecStatuses |= m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadAuxiliaryGroupA()), 
+    rxbuf[6])<<6;
+  //ThisThread::sleep_for(1);
+
+  // Voltage = val • 100μV
+  uint8_t measCursor = 0;
+  if (!pecStatuses) {
+    for (unsigned int k = 0; k < NUM_CHIPS; k++) { // iterate over each chip's worth of data
+      for (unsigned int j = 0; j < 6; j++) { // iterate through each cell voltage group
+        for (unsigned int i = 0; i < 6; i+= 2) {
+          cellVoltages[k][measCursor] = ((uint16_t)rxbuf[j][k][i]) | ((uint16_t)rxbuf[j][k][i + 1] << 8);
+          //std::cout << (int)cellCursor << ": " << voltages[k][cellCursor] << '\n';
+          measCursor++;
+        }
+      }
+      measCursor = 0;
+    // Register A has 3 GPIOs of data but we only want the first 2
+      for (unsigned int i = 0; i < 4; i+= 2) {
+        adcVoltages[k][measCursor] = ((uint16_t)rxbuf[6][k][i]) | ((uint16_t)rxbuf[6][k][i + 1] << 8);
+        //std::cout << (int)measCursor << ": " << voltages[k][measCursor] << '\n';
+        measCursor++;
+      }
+      measCursor = 0;
+    }
+  } // TODO: an else here. return PEC fault to BMS thread
+}
+
 void LTC6813Bus::getStatus(LTC6813::Status statuses[NUM_CHIPS]) {
   //Timer t;
   //t.start();

@@ -169,3 +169,11 @@ class StartStatusADC : public LTC681xCommand {
     return 0x0468 | ((uint16_t)adcMode << 7) | ((uint16_t)statusSelection);
   }
 };
+class StartCombinedADC : public LTC681xCommand {
+ public:
+  StartCombinedADC(AdcMode a) : adcMode(a) {}
+  AdcMode adcMode;
+  uint16_t toValue() const {
+    return 0x046F | ((uint16_t)adcMode << 7);
+  }
+};
