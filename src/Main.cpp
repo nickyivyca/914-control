@@ -89,6 +89,9 @@ int main() {
     // Sleep 100 secs
     //ThisThread::sleep_for(100 * 1000);
   }*/
+  mail_t *msg_init = inbox_data.alloc();
+  msg_init->msg_event = DATA_INIT;
+  inbox_data.put(msg_init);
   Timer t;
   t.start();
   while (1) {
@@ -110,17 +113,20 @@ int main() {
               //std::cout << "New BMS data received\n";
               data_main.mutex.lock();
               data_bms.mutex.lock();
-              memcpy(&data_main.batterysummary, &data_bms.batterysummary, sizeof(data_main.batterysummary));
+              //memcpy(&data_main.batterysummary, &data_bms.batterysummary, sizeof(data_main.batterysummary));
+              memcpy(&data_main.batterydata, &data_bms.batterydata, sizeof(data_main.batterydata));
               data_bms.mutex.unlock();
               data_data.mutex.lock();
-              memcpy(&data_data.batterysummary, &data_main.batterysummary, sizeof(data_data.batterysummary));
+              //memcpy(&data_data.batterysummary, &data_main.batterysummary, sizeof(data_data.batterysummary));
+              memcpy(&data_data.batterydata, &data_main.batterydata, sizeof(data_data.batterydata));
               data_data.mutex.unlock();
 
               data_main.mutex.unlock();
               //std::cout << "Copy took " << (t.read_ms() - copystart) << "ms. Telling data thread about it\n";
 
               mail_t *msg_out = inbox_data.alloc();
-              msg_out->msg_event = DATA_SUMMARY;
+              //msg_out->msg_event = DATA_SUMMARY;
+              msg_out->msg_event = DATA_DATA;
               inbox_data.put(msg_out);
             }
             break;

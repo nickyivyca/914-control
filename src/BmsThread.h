@@ -72,7 +72,7 @@ class BMSThread {
 
     float current_zero = 2.5;
 
-    std::cout << "time_millis,totalCurrent";
+    /*std::cout << "time_millis,totalCurrent";
     for (uint16_t i = 0; i < NUM_CHIPS/2; i++) {
       for (uint16_t j = 1; j <= NUM_CELLS_PER_CHIP*2; j++) {
         std::cout << ",V_" << (char)('A'+i) << j;
@@ -80,7 +80,7 @@ class BMSThread {
     }
     for (uint16_t i = 0; i < NUM_CHIPS; i++) {
       std::cout << ",T_" << (char)('A'+(i/2)) << (i%2)+1;
-    }
+    }*/
     std::cout << '\n';
     Timer t;
     t.start();
@@ -299,6 +299,8 @@ class BMSThread {
       m_batterysummary->maxTemp_box = maxTemp_box;
       m_batterysummary->totalCurrent = totalCurrent;
       m_batterysummary->totalVoltage = totalVoltage;
+
+      m_batterydata->totalCurrent = totalCurrent;
 
       m_mutex->unlock();
 

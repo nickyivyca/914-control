@@ -48,10 +48,33 @@ class DataThread {
             uint32_t startTime = t.read_ms();
             switch(msg->msg_event) {
               case DATA_INIT:
-                std::cout << "Data thread received init\n";
+                //std::cout << "Data thread received init\n";
+
+                // Print CSV header
+                std::cout << "time_millis,totalCurrent";
+                for (uint16_t i = 0; i < NUM_CHIPS/2; i++) {
+                  for (uint16_t j = 1; j <= NUM_CELLS_PER_CHIP*2; j++) {
+                    std::cout << ",V_" << (char)('A'+i) << j;
+                  }
+                }
+                for (uint16_t i = 0; i < NUM_CHIPS; i++) {
+                  std::cout << ",T_" << (char)('A'+(i/2)) << (i%2)+1;
+                }
                 break;
               case DATA_DATA:
-                std::cout << "Data thread received full data\n";
+                {
+                  float totalCurrent_scaled = ((float)m_data->totalCurrent)/1000.0;
+                  //std::cout << "Data thread received full data\n";
+                  // Print line of CSV data
+                  std::cout << t.read_ms() << ',' << totalCurrent_scaled;
+                  for (uint16_t i = 0; i < NUM_CHIPS * NUM_CELLS_PER_CHIP; i++) {
+                    std::cout << ',' << m_data->allVoltages[i];
+                  }
+                  for (uint16_t i = 0; i < NUM_CHIPS; i++) {
+                    std::cout << ',' << m_data->allTemperatures[i];
+                  }
+                  std::cout << '\n';
+                }
                 break;
               case DATA_SUMMARY:
                 //std::cout << "Data thread received summary\n";
