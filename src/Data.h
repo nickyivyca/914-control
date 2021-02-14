@@ -11,6 +11,8 @@ typedef struct {
   uint16_t allVoltages[NUM_CHIPS * NUM_CELLS_PER_CHIP];
   float allTemperatures[NUM_CHIPS];
   int totalCurrent;
+  uint16_t timestamp;
+  unsigned int packVoltage;
 } batterydata_t;
 
 typedef struct {
@@ -24,6 +26,7 @@ typedef struct {
   uint8_t maxTemp_box;
   int totalCurrent;
   unsigned int totalVoltage;
+  uint16_t timestamp;
 
 } batterysummary_t;
 

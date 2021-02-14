@@ -51,7 +51,7 @@ class DataThread {
                 //std::cout << "Data thread received init\n";
 
                 // Print CSV header
-                std::cout << "time_millis,totalCurrent";
+                std::cout << "time_millis,packVoltage,totalCurrent,kW";
                 for (uint16_t i = 0; i < NUM_CHIPS/2; i++) {
                   for (uint16_t j = 1; j <= NUM_CELLS_PER_CHIP*2; j++) {
                     std::cout << ",V_" << (char)('A'+i) << j;
@@ -60,13 +60,14 @@ class DataThread {
                 for (uint16_t i = 0; i < NUM_CHIPS; i++) {
                   std::cout << ",T_" << (char)('A'+(i/2)) << (i%2)+1;
                 }
+                std::cout << '\n';
                 break;
               case DATA_DATA:
                 {
                   float totalCurrent_scaled = ((float)m_data->totalCurrent)/1000.0;
                   //std::cout << "Data thread received full data\n";
                   // Print line of CSV data
-                  std::cout << t.read_ms() << ',' << totalCurrent_scaled;
+                  std::cout << m_data->timestamp << ',' << m_data->packVoltage/1000.0 << ',' << totalCurrent_scaled << ',' << totalCurrent_scaled * m_data->packVoltage / 1000000.0;
                   for (uint16_t i = 0; i < NUM_CHIPS * NUM_CELLS_PER_CHIP; i++) {
                     std::cout << ',' << m_data->allVoltages[i];
                   }

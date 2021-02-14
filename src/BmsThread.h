@@ -139,6 +139,8 @@ class BMSThread {
       m_bus->wakeupChainSpi();
       m_6813bus->updateConfig();
       m_6813bus->getCombined(voltages, gpio_adc);
+      m_batterydata->timestamp = t.read_ms();
+      m_batterysummary->timestamp = t.read_ms();
 
       /*LTC6813::Status statuses[NUM_CHIPS];
       m_6813bus->getStatus(statuses);*/
@@ -301,6 +303,7 @@ class BMSThread {
       m_batterysummary->totalVoltage = totalVoltage;
 
       m_batterydata->totalCurrent = totalCurrent;
+      m_batterydata->packVoltage = totalVoltage;
 
       m_mutex->unlock();
 
