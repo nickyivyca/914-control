@@ -53,6 +53,9 @@ class BMSThread {
   uint16_t voltages[NUM_CHIPS][18];
   uint16_t gpio_adc[NUM_CHIPS][2];
 
+  float currentZero;
+  bool currentZeroed = false;
+
   enum state {INIT, RUN, FAULT};
 
   state currentState = INIT;
@@ -69,8 +72,6 @@ class BMSThread {
 
     uint8_t balance_index = 0;
     uint16_t prevMinVoltage = 0;
-
-    float current_zero = 2.5;
 
     /*std::cout << "time_millis,totalCurrent";
     for (uint16_t i = 0; i < NUM_CHIPS/2; i++) {
@@ -236,9 +237,13 @@ class BMSThread {
         //serial->printf("\n");
         // Calculate current sensor
         if (!((i-1) % 6)) {
+          if (!currentZeroed) {
+            currentZero = gpio_adc[i][0]/10000.0;
+            currentZeroed = true;
+          }
           // replace 2.497 with zero'd value from startup? maybe use ref
-          int current = (50.0 * (gpio_adc[i][0]/10000.0 - 2.497) / 0.625) * 1000.0; // unit mA
-          totalCurrent += current/5; 
+          int current = (50.0 * (gpio_adc[i][0]/10000.0 - currentZero) / 0.625) * 1000.0; // unit mA
+          totalCurrent += current/5;
           //std::cout << "Current: " << current << '\n';
         }
         // Calculate thermistors: present on even chips (lower chip of each box)
