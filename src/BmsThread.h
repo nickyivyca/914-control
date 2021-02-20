@@ -237,13 +237,14 @@ class BMSThread {
         //serial->printf("\n");
         // Calculate current sensor
         if (!((i-1) % 6)) {
+        //if (i == 5) {
           if (!currentZeroed) {
             currentZero = gpio_adc[i][0]/10000.0;
             currentZeroed = true;
           }
           // replace 2.497 with zero'd value from startup? maybe use ref
-          int current = (50.0 * (gpio_adc[i][0]/10000.0 - currentZero) / 0.625) * 1000.0; // unit mA
-          totalCurrent += current/5;
+          int current = (ISENSE_RANGE * (gpio_adc[i][0]/10000.0 - currentZero) / 0.625) * 1000.0; // unit mA
+          totalCurrent += current;
           //std::cout << "Current: " << current << '\n';
         }
         // Calculate thermistors: present on even chips (lower chip of each box)

@@ -7,6 +7,7 @@
 //
 // This allows for all files to access the serial output
 extern Serial* serial;
+extern Serial* serial2;
 
 // Global pointer to can bus object
 //
@@ -17,6 +18,11 @@ extern CAN* canBus;
 // Number of 6813 chips on isospi bus
 #ifndef NUM_CHIPS
 #define NUM_CHIPS 2
+#endif
+
+// Nominal range of the LEM sensor
+#ifndef ISENSE_RANGE
+#define ISENSE_RANGE 50.0
 #endif
 
 #ifndef CELL_SENSE_FREQUENCY

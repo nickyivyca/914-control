@@ -17,6 +17,7 @@
 
 
 Serial* serial;
+Serial* serial2;
 CAN* canBus;
 
 batterycomm_t data_main;
@@ -113,11 +114,11 @@ int main() {
               //std::cout << "New BMS data received\n";
               data_main.mutex.lock();
               data_bms.mutex.lock();
-              //memcpy(&data_main.batterysummary, &data_bms.batterysummary, sizeof(data_main.batterysummary));
+              memcpy(&data_main.batterysummary, &data_bms.batterysummary, sizeof(data_main.batterysummary));
               memcpy(&data_main.batterydata, &data_bms.batterydata, sizeof(data_main.batterydata));
               data_bms.mutex.unlock();
               data_data.mutex.lock();
-              //memcpy(&data_data.batterysummary, &data_main.batterysummary, sizeof(data_data.batterysummary));
+              memcpy(&data_data.batterysummary, &data_main.batterysummary, sizeof(data_data.batterysummary));
               memcpy(&data_data.batterydata, &data_main.batterydata, sizeof(data_data.batterydata));
               data_data.mutex.unlock();
 
@@ -125,8 +126,8 @@ int main() {
               //std::cout << "Copy took " << (t.read_ms() - copystart) << "ms. Telling data thread about it\n";
 
               mail_t *msg_out = inbox_data.alloc();
-              //msg_out->msg_event = DATA_SUMMARY;
-              msg_out->msg_event = DATA_DATA;
+              msg_out->msg_event = DATA_SUMMARY;
+              //msg_out->msg_event = DATA_DATA;
               inbox_data.put(msg_out);
             }
             break;
@@ -146,6 +147,9 @@ int main() {
 void initIO() {
   serial = new Serial(USBTX, USBRX);
   serial->baud(230400);
+
+  serial2 = new Serial(USBTX, USBRX);
+  serial2->baud(230400);
   //serial->printf("INIT\n");
   
   canBus = new CAN(PIN_CAN_TX, PIN_CAN_RX, CAN_FREQUENCY);

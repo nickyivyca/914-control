@@ -80,7 +80,6 @@ class DataThread {
               case DATA_SUMMARY:
                 //std::cout << "Data thread received summary\n";
                 {
-
                   float totalVoltage_scaled = ((float)m_summary->totalVoltage)/1000.0;
                   float totalCurrent_scaled = ((float)m_summary->totalCurrent)/1000.0;
 
@@ -89,7 +88,7 @@ class DataThread {
                   << "\nPower: " << ceil(totalCurrent_scaled * (totalVoltage_scaled * 10.0) / 1000.0) / 10.0 << "kW"  // round to 1 decimal place, scale to kW
                   << "\nMax Cell: " << m_summary->maxVoltage << " " << (char)('A'+(m_summary->maxVoltage_cell/28)) << (m_summary->maxVoltage_cell%28)+1
                   << " Min Cell: " << m_summary->minVoltage << " " << (char)('A'+(m_summary->minVoltage_cell/28)) << (m_summary->minVoltage_cell%28)+1
-                  << " Avg Cell: " << (totalVoltage_scaled/(NUM_CELLS_PER_CHIP*NUM_CHIPS))
+                  << " Avg Cell: " << ceil(totalVoltage_scaled/(NUM_CELLS_PER_CHIP*NUM_CHIPS) * 100.0) / 100.0
                   << "\nMax Temp: " << m_summary->maxTemp << " " << (char)('A'+(m_summary->maxTemp_box/2)) << (m_summary->maxTemp_box%2)+1
                   << " Min Temp: " << m_summary->minTemp << " " << (char)('A'+(m_summary->minTemp_box/2)) << (m_summary->minTemp_box%2)+1;
                   std::cout << '\n';
