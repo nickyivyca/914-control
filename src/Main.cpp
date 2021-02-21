@@ -126,8 +126,11 @@ int main() {
               //std::cout << "Copy took " << (t.read_ms() - copystart) << "ms. Telling data thread about it\n";
 
               mail_t *msg_out = inbox_data.alloc();
+              msg_out->msg_event = DATA_DATA;
+              //msg_out->msg_event = DATA_SUMMARY;
+              inbox_data.put(msg_out);
+              msg_out = inbox_data.alloc();
               msg_out->msg_event = DATA_SUMMARY;
-              //msg_out->msg_event = DATA_DATA;
               inbox_data.put(msg_out);
             }
             break;
@@ -145,11 +148,9 @@ int main() {
 }
 
 void initIO() {
-  serial = new Serial(USBTX, USBRX);
-  serial->baud(230400);
+  serial = new Serial(USBTX, USBRX, 230400);
 
-  serial2 = new Serial(USBTX, USBRX);
-  serial2->baud(230400);
+  serial2 = new Serial(PIN_SERIAL2_TX, PIN_SERIAL2_RX, 230400);
   //serial->printf("INIT\n");
   
   canBus = new CAN(PIN_CAN_TX, PIN_CAN_RX, CAN_FREQUENCY);

@@ -9,6 +9,14 @@
 extern Serial* serial;
 extern Serial* serial2;
 
+
+#ifndef PIN_SERIAL2_TX
+#define PIN_SERIAL2_TX p9
+#endif
+#ifndef PIN_SERIAL2_RX
+#define PIN_SERIAL2_RX p10
+#endif
+
 // Global pointer to can bus object
 //
 // This allows for all files to access the can bus output
