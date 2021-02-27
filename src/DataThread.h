@@ -56,30 +56,32 @@ class DataThread {
                 //std::cout << "Data thread received init\n";
 
                 // Print CSV header
-                std::cout << "time_millis,packVoltage,totalCurrent,kW";
+                printbuff << "time_millis,packVoltage,totalCurrent,kW";
                 for (uint16_t i = 0; i < NUM_CHIPS/2; i++) {
                   for (uint16_t j = 1; j <= NUM_CELLS_PER_CHIP*2; j++) {
-                    std::cout << ",V_" << (char)('A'+i) << j;
+                    printbuff << ",V_" << (char)('A'+i) << j;
                   }
                 }
                 for (uint16_t i = 0; i < NUM_CHIPS; i++) {
-                  std::cout << ",T_" << (char)('A'+(i/2)) << (i%2)+1;
+                  printbuff << ",T_" << (char)('A'+(i/2)) << (i%2)+1;
                 }
-                std::cout << '\n';
+                printbuff << '\n';
+                serial2->printf(printbuff.str().c_str());
                 break;
               case DATA_DATA:
                 {
                   float totalCurrent_scaled = ((float)m_data->totalCurrent)/1000.0;
                   //std::cout << "Data thread received full data\n";
                   // Print line of CSV data
-                  std::cout << m_data->timestamp << ',' << m_data->packVoltage/1000.0 << ',' << totalCurrent_scaled << ',' << totalCurrent_scaled * m_data->packVoltage / 1000000.0;
+                  printbuff << m_data->timestamp << ',' << m_data->packVoltage/1000.0 << ',' << totalCurrent_scaled << ',' << totalCurrent_scaled * m_data->packVoltage / 1000000.0;
                   for (uint16_t i = 0; i < NUM_CHIPS * NUM_CELLS_PER_CHIP; i++) {
-                    std::cout << ',' << m_data->allVoltages[i];
+                    printbuff << ',' << m_data->allVoltages[i];
                   }
                   for (uint16_t i = 0; i < NUM_CHIPS; i++) {
-                    std::cout << ',' << m_data->allTemperatures[i];
+                    printbuff << ',' << m_data->allTemperatures[i];
                   }
-                  std::cout << '\n';
+                  printbuff << '\n';
+                  serial2->printf(printbuff.str().c_str());
                 }
                 break;
               case DATA_SUMMARY:
@@ -99,8 +101,8 @@ class DataThread {
                   << "\nMax Temp: " << m_summary->maxTemp << " " << (char)('A'+(m_summary->maxTemp_box/2)) << (m_summary->maxTemp_box%2)+1
                   << " Min Temp: " << m_summary->minTemp << " " << (char)('A'+(m_summary->minTemp_box/2)) << (m_summary->minTemp_box%2)+1;
                   printbuff << "\n\n";
-                  //std::cout << printbuff.str();
-                  serial2->printf(printbuff.str().c_str());
+                  std::cout << printbuff.str();
+                  //serial2->printf(printbuff.str().c_str());
                 }
                 break;
               default:

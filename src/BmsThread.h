@@ -5,6 +5,7 @@
 #include <vector>
 #include <algorithm>
 #include <iostream>
+#include <bitset>
 
 #include "mbed.h"
 #include "rtos.h"
@@ -139,7 +140,7 @@ class BMSThread {
       }*/
       m_bus->wakeupChainSpi();
       m_6813bus->updateConfig();
-      m_6813bus->getCombined(voltages, gpio_adc);
+      uint8_t pecStatus = m_6813bus->getCombined(voltages, gpio_adc);
       m_batterydata->timestamp = t.read_ms();
       m_batterysummary->timestamp = t.read_ms();
 
@@ -166,156 +167,162 @@ class BMSThread {
       // Done with communication at this point
       // Now time to crunch numbers
 
-      m_mutex->lock();
 
-      for (unsigned int i = 0; i < NUM_CHIPS; i++) {
+      if (!pecStatus) {
+        m_mutex->lock();
+        for (unsigned int i = 0; i < NUM_CHIPS; i++) {
 
-        //serial->printf("Chip %d:\n", i);
+          //serial->printf("Chip %d:\n", i);
 
-        /*std::cout << "Sum: " << statuses[i].sumAllCells
-        << "\nInternal Temp: " << statuses[i].internalTemperature
-        << "\nAnalog Reference: " << statuses[i].voltageAnalog
-        << "\nDigital Reference: " << statuses[i].voltageDigital
-        << "\n";*/
-        //totalVoltage += statuses[i].sumAllCells;
-
-
-        // Process voltages
-        //serial->printf("Voltages: ");
-        for (int j = 0; j < 18; j++) {
-          uint16_t voltage = voltages[i][j] / 10;
+          /*std::cout << "Sum: " << statuses[i].sumAllCells
+          << "\nInternal Temp: " << statuses[i].internalTemperature
+          << "\nAnalog Reference: " << statuses[i].voltageAnalog
+          << "\nDigital Reference: " << statuses[i].voltageDigital
+          << "\n";*/
+          //totalVoltage += statuses[i].sumAllCells;
 
 
-          int index = BMS_CELL_MAP[j];
-          if (index != -1) {
-            m_batterydata->allVoltages[(NUM_CELLS_PER_CHIP * i) + index] = voltage;
-            totalVoltage += voltage;
+          // Process voltages
+          //serial->printf("Voltages: ");
+          for (int j = 0; j < 18; j++) {
+            uint16_t voltage = voltages[i][j] / 10;
 
-            if (voltage < minVoltage && voltage != 0) {
-              minVoltage = voltage;
-              minVoltage_cell = index + 14*i;
-            }
-            if (voltage > maxVoltage) {
-              maxVoltage = voltage;
-              maxVoltage_cell = index + 14*i;
-            }
-            //totalVoltage += voltage;
-            //serial->printf("%dmV ", voltage);
 
-            // if (voltage >= BMS_FAULT_VOLTAGE_THRESHOLD_HIGH) {
-            //   // Set fault line
-            //   serial->printf("***** BMS LOW VOLTAGE FAULT *****\nVoltage at %d\n\n", voltage);
-            //   throwBmsFault();
-            // }
-            // if (voltage <= BMS_FAULT_VOLTAGE_THRESHOLD_LOW) {
-            //   // Set fault line
-            //   serial->printf("***** BMS HIGH VOLTAGE FAULT *****\nVoltage at %d\n\n", voltage);
-            //   throwBmsFault();
-            // }
+            int index = BMS_CELL_MAP[j];
+            if (index != -1) {
+              m_batterydata->allVoltages[(NUM_CELLS_PER_CHIP * i) + index] = voltage;
+              totalVoltage += voltage;
 
-            // Discharge cells if enabled
+              if (voltage < minVoltage && voltage != 0) {
+                minVoltage = voltage;
+                minVoltage_cell = index + 14*i;
+              }
+              if (voltage > maxVoltage) {
+                maxVoltage = voltage;
+                maxVoltage_cell = index + 14*i;
+              }
+              //totalVoltage += voltage;
+              //serial->printf("%dmV ", voltage);
 
-            LTC6813::Configuration& conf = m_6813bus->m_chips[i].getConfig();
-            if(m_discharging) {
-              if((voltage > prevMinVoltage) && (voltage - prevMinVoltage > BMS_DISCHARGE_THRESHOLD)) {
-                // Discharge
+              // if (voltage >= BMS_FAULT_VOLTAGE_THRESHOLD_HIGH) {
+              //   // Set fault line
+              //   serial->printf("***** BMS LOW VOLTAGE FAULT *****\nVoltage at %d\n\n", voltage);
+              //   throwBmsFault();
+              // }
+              // if (voltage <= BMS_FAULT_VOLTAGE_THRESHOLD_LOW) {
+              //   // Set fault line
+              //   serial->printf("***** BMS HIGH VOLTAGE FAULT *****\nVoltage at %d\n\n", voltage);
+              //   throwBmsFault();
+              // }
 
-                serial->printf("DISCHARGE CELL %d: %dmV (%dmV)\n", index, voltage, (voltage - prevMinVoltage));
+              // Discharge cells if enabled
 
-                // Enable discharging
-                conf.dischargeState.value |= (1 << j);
+              LTC6813::Configuration& conf = m_6813bus->m_chips[i].getConfig();
+              if(m_discharging) {
+                if((voltage > prevMinVoltage) && (voltage - prevMinVoltage > BMS_DISCHARGE_THRESHOLD)) {
+                  // Discharge
+
+                  serial->printf("DISCHARGE CELL %d: %dmV (%dmV)\n", index, voltage, (voltage - prevMinVoltage));
+
+                  // Enable discharging
+                  conf.dischargeState.value |= (1 << j);
+                } else {
+                  // Disable discharging
+                  conf.dischargeState.value &= ~(1 << j);
+                }
               } else {
                 // Disable discharging
                 conf.dischargeState.value &= ~(1 << j);
               }
-            } else {
-              // Disable discharging
-              conf.dischargeState.value &= ~(1 << j);
+            }
+          }
+          //serial->printf("\n");
+          // Calculate current sensor
+          if (!((i-1) % 6)) {
+          //if (i == 5) {
+            if (!currentZeroed) {
+              currentZero = gpio_adc[i][0]/10000.0;
+              currentZeroed = true;
+            }
+            // replace 2.497 with zero'd value from startup? maybe use ref
+            int current = (ISENSE_RANGE * (gpio_adc[i][0]/10000.0 - currentZero) / 0.625) * 1000.0; // unit mA
+            totalCurrent += current;
+            //std::cout << "Current: " << current << '\n';
+          }
+          // Calculate thermistors: present on even chips (lower chip of each box)
+          if (!(i % 2)) {
+            for (uint8_t j = 0; j < 2; j++) {
+              // calculate resistance from voltage
+              float thermvolt = gpio_adc[i][j]/10000.0;
+              float resistance = (4700.0 * thermvolt)/(5.0 - thermvolt);
+              //std::cout << "Calculated resistance " << j+1 << ":  " << resistance << "\n";
+
+              // https://github.com/panStamp/thermistor/blob/master/thermistor.cpp
+              float steinhart;
+              steinhart = resistance / 10000.0;     // (R/Ro)
+              steinhart = log(steinhart);                  // ln(R/Ro)
+              steinhart /= 3380.0;                   // 1/B * ln(R/Ro)
+              steinhart += 1.0 / (25.0 + 273.15); // + (1/To)
+              steinhart = 1.0 / steinhart;                 // Invert
+              steinhart -= 273.15;                         // convert to C
+              steinhart = ceil(steinhart * 10.0) / 10.0;   // round to 1 decimal place
+
+
+              if (!isnan(steinhart)) {
+                m_batterydata->allTemperatures[i+j] = steinhart;
+                //std::cout << "NTC " << j+1 << ": " << steinhart << '\n';
+                if (steinhart < minTemp && steinhart != 0){
+                  minTemp = steinhart;
+                  minTemp_box = j + i;
+                }
+                if (steinhart > maxTemp) {
+                  maxTemp = steinhart;
+                  maxTemp_box = j + i;
+                }
+              }
+
             }
           }
         }
-        //serial->printf("\n");
-        // Calculate current sensor
-        if (!((i-1) % 6)) {
-        //if (i == 5) {
-          if (!currentZeroed) {
-            currentZero = gpio_adc[i][0]/10000.0;
-            currentZeroed = true;
-          }
-          // replace 2.497 with zero'd value from startup? maybe use ref
-          int current = (ISENSE_RANGE * (gpio_adc[i][0]/10000.0 - currentZero) / 0.625) * 1000.0; // unit mA
-          totalCurrent += current;
-          //std::cout << "Current: " << current << '\n';
-        }
-        // Calculate thermistors: present on even chips (lower chip of each box)
-        if (!(i % 2)) {
-          for (uint8_t j = 0; j < 2; j++) {
-            // calculate resistance from voltage
-            float thermvolt = gpio_adc[i][j]/10000.0;
-            float resistance = (4700.0 * thermvolt)/(5.0 - thermvolt);
-            //std::cout << "Calculated resistance " << j+1 << ":  " << resistance << "\n";
+      
 
-            // https://github.com/panStamp/thermistor/blob/master/thermistor.cpp
-            float steinhart;
-            steinhart = resistance / 10000.0;     // (R/Ro)
-            steinhart = log(steinhart);                  // ln(R/Ro)
-            steinhart /= 3380.0;                   // 1/B * ln(R/Ro)
-            steinhart += 1.0 / (25.0 + 273.15); // + (1/To)
-            steinhart = 1.0 / steinhart;                 // Invert
-            steinhart -= 273.15;                         // convert to C
-            steinhart = ceil(steinhart * 10.0) / 10.0;   // round to 1 decimal place
+        /*float totalVoltage_scaled = ((float)totalVoltage)/1000.0;
+        float totalCurrent_scaled = ((float)totalCurrent)/1000.0;
 
+        std::cout << "Pack Voltage: " << ceil(totalVoltage_scaled * 10.0) / 10.0 << "V"  // round to 1 decimal place
+        << " Current: " << totalCurrent_scaled << "A"
+        << "\nPower: " << ceil(totalCurrent_scaled * (totalVoltage_scaled * 10.0) / 1000.0) / 10.0 << "kW"  // round to 1 decimal place, scale to kW
+        << "\nMax Cell: " << maxVoltage << " " << (char)('A'+(maxVoltage_cell/28)) << (maxVoltage_cell%28)+1
+        << " Min Cell: " << minVoltage << " " << (char)('A'+(minVoltage_cell/28)) << (minVoltage_cell%28)+1
+        << " Avg Cell: " << (totalVoltage_scaled/(NUM_CELLS_PER_CHIP*NUM_CHIPS))
+        << "\nMax Temp: " << maxTemp << " " << (char)('A'+(maxTemp_box/2)) << (maxTemp_box%2)+1
+        << " Min Temp: " << minTemp << " " << (char)('A'+(minTemp_box/2)) << (minTemp_box%2)+1;
+        std::cout << '\n';
+        std::cout << '\n';*/
 
-            if (!isnan(steinhart)) {
-              m_batterydata->allTemperatures[i+j] = steinhart;
-              //std::cout << "NTC " << j+1 << ": " << steinhart << '\n';
-              if (steinhart < minTemp && steinhart != 0){
-                minTemp = steinhart;
-                minTemp_box = j + i;
-              }
-              if (steinhart > maxTemp) {
-                maxTemp = steinhart;
-                maxTemp_box = j + i;
-              }
-            }
+        m_batterysummary->minVoltage = minVoltage;
+        m_batterysummary->minVoltage_cell = minVoltage_cell;
+        m_batterysummary->maxVoltage = maxVoltage;
+        m_batterysummary->maxVoltage_cell = maxVoltage_cell;
+        m_batterysummary->minTemp = minTemp;
+        m_batterysummary->minTemp_box = minTemp_box;
+        m_batterysummary->maxTemp = maxTemp;
+        m_batterysummary->maxTemp_box = maxTemp_box;
+        m_batterysummary->totalCurrent = totalCurrent;
+        m_batterysummary->totalVoltage = totalVoltage;
 
-          }
-        }
+        m_batterydata->totalCurrent = totalCurrent;
+        m_batterydata->packVoltage = totalVoltage;
+
+        m_mutex->unlock();
+
+        mail_t *msg = m_outbox->alloc();
+        msg->msg_event = NEW_CELL_DATA;
+        m_outbox->put(msg);
+      } else {
+        std::bitset<8> pecprint(pecStatus);
+        std::cout << "PEC error! " << pecprint << '\n';
       }
-
-      /*float totalVoltage_scaled = ((float)totalVoltage)/1000.0;
-      float totalCurrent_scaled = ((float)totalCurrent)/1000.0;
-
-      std::cout << "Pack Voltage: " << ceil(totalVoltage_scaled * 10.0) / 10.0 << "V"  // round to 1 decimal place
-      << " Current: " << totalCurrent_scaled << "A"
-      << "\nPower: " << ceil(totalCurrent_scaled * (totalVoltage_scaled * 10.0) / 1000.0) / 10.0 << "kW"  // round to 1 decimal place, scale to kW
-      << "\nMax Cell: " << maxVoltage << " " << (char)('A'+(maxVoltage_cell/28)) << (maxVoltage_cell%28)+1
-      << " Min Cell: " << minVoltage << " " << (char)('A'+(minVoltage_cell/28)) << (minVoltage_cell%28)+1
-      << " Avg Cell: " << (totalVoltage_scaled/(NUM_CELLS_PER_CHIP*NUM_CHIPS))
-      << "\nMax Temp: " << maxTemp << " " << (char)('A'+(maxTemp_box/2)) << (maxTemp_box%2)+1
-      << " Min Temp: " << minTemp << " " << (char)('A'+(minTemp_box/2)) << (minTemp_box%2)+1;
-      std::cout << '\n';
-      std::cout << '\n';*/
-
-      m_batterysummary->minVoltage = minVoltage;
-      m_batterysummary->minVoltage_cell = minVoltage_cell;
-      m_batterysummary->maxVoltage = maxVoltage;
-      m_batterysummary->maxVoltage_cell = maxVoltage_cell;
-      m_batterysummary->minTemp = minTemp;
-      m_batterysummary->minTemp_box = minTemp_box;
-      m_batterysummary->maxTemp = maxTemp;
-      m_batterysummary->maxTemp_box = maxTemp_box;
-      m_batterysummary->totalCurrent = totalCurrent;
-      m_batterysummary->totalVoltage = totalVoltage;
-
-      m_batterydata->totalCurrent = totalCurrent;
-      m_batterydata->packVoltage = totalVoltage;
-
-      m_mutex->unlock();
-
-      mail_t *msg = m_outbox->alloc();
-      msg->msg_event = NEW_CELL_DATA;
-      m_outbox->put(msg);
 
 
       /*uint16_t mean = (totalVoltage/(NUM_CELLS_PER_CHIP*NUM_CHIPS));

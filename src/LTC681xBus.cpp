@@ -281,7 +281,7 @@ void LTC681xBus::readCommand(Command txCmd, uint8_t *rxbuf) {
   bool goodPec = ((uint8_t)(dataPec >> 8)) == rxbuf[6] && ((uint8_t)dataPec) == rxbuf[7];
   if (!goodPec) {
     // TODO: return error or throw out read result
-    serial->printf("ERR: Bad PEC on read. Computed: 0x%x. Actual: 0x%x\r\n", dataPec, (uint16_t)(rxbuf[6] << 8 | rxbuf[7]));
+    //serial->printf("ERR: Bad PEC on read. Computed: 0x%x. Actual: 0x%x\r\n", dataPec, (uint16_t)(rxbuf[6] << 8 | rxbuf[7]));
   }
 }
 
@@ -322,8 +322,8 @@ uint8_t LTC681xBus::readWholeChainCommand(Command txCmd, uint8_t rxbuf[NUM_CHIPS
     bool goodPec = ((uint8_t)(dataPec >> 8)) == rxbuf[i][6] && ((uint8_t)dataPec) == rxbuf[i][7];
     if (!goodPec) {
       // TODO: return error or throw out read result
-      serial->printf("ERR: Bad PEC on read on chip %d. Computed: 0x%x. Actual: 0x%x\r\n",
-        i, dataPec, (uint16_t)(rxbuf[i][6] << 8 | rxbuf[i][7]));
+      /*serial->printf("ERR: Bad PEC on read on chip %d. Computed: 0x%x. Actual: 0x%x\r\n",
+        i, dataPec, (uint16_t)(rxbuf[i][6] << 8 | rxbuf[i][7]));*/
       return 1;
     }
   }

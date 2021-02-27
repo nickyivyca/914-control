@@ -192,7 +192,7 @@ void LTC6813Bus::getGpio(uint16_t voltages[NUM_CHIPS][9]) {
   }
 }
 
-void LTC6813Bus::getCombined(uint16_t cellVoltages[NUM_CHIPS][18], uint16_t adcVoltages[NUM_CHIPS][2]) {
+uint8_t LTC6813Bus::getCombined(uint16_t cellVoltages[NUM_CHIPS][18], uint16_t adcVoltages[NUM_CHIPS][2]) {
   //Timer t;
   //t.start();
   m_bus.sendCommandPollADC(LTC681xBus::buildBroadcastCommand(StartCombinedADC(AdcMode::k7k)));
@@ -242,7 +242,8 @@ void LTC6813Bus::getCombined(uint16_t cellVoltages[NUM_CHIPS][18], uint16_t adcV
       }
       measCursor = 0;
     }
-  } // TODO: an else here. return PEC fault to BMS thread
+  } 
+  return pecStatuses;
 }
 
 void LTC6813Bus::getStatus(LTC6813::Status statuses[NUM_CHIPS]) {
