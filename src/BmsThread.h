@@ -238,8 +238,7 @@ class BMSThread {
           }
           //serial->printf("\n");
           // Calculate current sensor
-          if (!((i-1) % 6)) {
-          //if (i == 5) {
+          if (i == ISENSE_LOCATION) {
             if (!currentZeroed) {
               currentZero = gpio_adc[i][0]/10000.0;
               currentZeroed = true;

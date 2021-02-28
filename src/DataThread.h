@@ -3,6 +3,7 @@
 #include <string>
 #include <iostream>
 #include <sstream>
+#include <iomanip> 
 
 #include "mbed.h"
 #include "rtos.h"
@@ -73,7 +74,7 @@ class DataThread {
                   float totalCurrent_scaled = ((float)m_data->totalCurrent)/1000.0;
                   //std::cout << "Data thread received full data\n";
                   // Print line of CSV data
-                  printbuff << m_data->timestamp << ',' << m_data->packVoltage/1000.0 << ',' << totalCurrent_scaled << ',' << totalCurrent_scaled * m_data->packVoltage / 1000000.0;
+                  printbuff << std::fixed << std::setprecision(1) << m_data->timestamp << ',' << m_data->packVoltage/1000.0 << ',' << totalCurrent_scaled << ',' << totalCurrent_scaled * m_data->packVoltage / 1000000.0;
                   for (uint16_t i = 0; i < NUM_CHIPS * NUM_CELLS_PER_CHIP; i++) {
                     printbuff << ',' << m_data->allVoltages[i];
                   }
@@ -92,9 +93,9 @@ class DataThread {
 
 
 
-                  printbuff << "Pack Voltage: " << ceil(totalVoltage_scaled * 10.0) / 10.0 << "V"  // round to 1 decimal place
+                  printbuff << std::fixed << std::setprecision(1) << "Pack Voltage: " << totalVoltage_scaled << "V"  // round to 1 decimal place
                   << " Current: " << totalCurrent_scaled << "A"
-                  << "\nPower: " << ceil(totalCurrent_scaled * (totalVoltage_scaled * 10.0) / 1000.0) / 10.0 << "kW"  // round to 1 decimal place, scale to kW
+                  << "\nPower: " << totalCurrent_scaled * (totalVoltage_scaled) / 1000.0 << "kW"  // scale to kW
                   << "\nMax Cell: " << m_summary->maxVoltage << " " << (char)('A'+(m_summary->maxVoltage_cell/28)) << (m_summary->maxVoltage_cell%28)+1
                   << " Min Cell: " << m_summary->minVoltage << " " << (char)('A'+(m_summary->minVoltage_cell/28)) << (m_summary->minVoltage_cell%28)+1
                   << " Avg Cell: " << m_summary->totalVoltage/(NUM_CELLS_PER_CHIP*NUM_CHIPS)
