@@ -30,7 +30,12 @@ extern CAN* canBus;
 
 // Nominal range of the LEM sensor
 #ifndef ISENSE_RANGE
-#define ISENSE_RANGE 50.0
+#define ISENSE_RANGE 200.0
+#endif
+
+// Chip number for where the LEM is plugged in, 0 indexed
+#ifndef ISENSE_LOCATION
+#define ISENSE_LOCATION 1
 #endif
 
 #ifndef CELL_SENSE_FREQUENCY
