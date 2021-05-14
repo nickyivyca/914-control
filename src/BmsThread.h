@@ -125,19 +125,25 @@ class BMSThread {
         conf.gpio4 = LTC6813::GPIOOutputState::kLow;
         conf.referencePowerOff = LTC6813::ReferencePowerOff::kWatchdogTimeout;
 
-        /*unsigned int index = BMS_CELL_MAP[balance_index];
+#ifdef TESTBALANCE
+        unsigned int index = BMS_CELL_MAP[balance_index];
         conf.dischargeState.value |= (1 << balance_index);
         if (balance_index) {
           conf.dischargeState.value |= (0 << balance_index-1);
         } else {
           conf.dischargeState.value |= (0 << 17);          
-        }*/
+        }
+#endif
       }
+
+      
+#ifdef TESTBALANCE
       //std::cout << "Balance index: " << (int)balance_index << "\n";
-      /*balance_index++;
+      balance_index++;
       if (balance_index == 18) {
         balance_index = 0;
-      }*/
+      }
+#endif
       m_bus->wakeupChainSpi();
       m_6813bus->updateConfig();
       uint8_t pecStatus = m_6813bus->getCombined(voltages, gpio_adc);

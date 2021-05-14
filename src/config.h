@@ -39,12 +39,16 @@ extern CAN* canBus;
 #endif
 
 #ifndef CELL_SENSE_FREQUENCY
-#define CELL_SENSE_FREQUENCY 20
+#define CELL_SENSE_FREQUENCY 5
 #endif
 
 #ifndef MAIN_PERIOD
 #define MAIN_PERIOD 10
 #endif
+
+// #ifndef TESTBALANCE
+// #define TESTBALANCE
+// #endif
 
 /*#ifndef DEBUGN
 #define DEBUGN
