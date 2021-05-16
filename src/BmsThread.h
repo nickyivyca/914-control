@@ -326,7 +326,11 @@ class BMSThread {
         m_outbox->put(msg);
       } else {
         std::bitset<8> pecprint(pecStatus);
-        std::cout << "PEC error! " << pecprint << '\n';
+
+        mail_t *msg = m_outbox->alloc();
+        msg->msg_event = BATT_ERR;
+        m_outbox->put(msg);
+        //std::cout << "PEC error! " << pecprint << '\n';
       }
 
 

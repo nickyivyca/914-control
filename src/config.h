@@ -8,6 +8,7 @@
 // This allows for all files to access the serial output
 extern Serial* serial;
 extern Serial* serial2;
+extern Serial* displayserial;
 
 
 #ifndef PIN_SERIAL2_TX
@@ -15,6 +16,12 @@ extern Serial* serial2;
 #endif
 #ifndef PIN_SERIAL2_RX
 #define PIN_SERIAL2_RX p10
+#endif
+#ifndef PIN_DISPLAY_TX
+#define PIN_DISPLAY_TX p9
+#endif
+#ifndef PIN_DISPLAY_RX
+#define PIN_DISPLAY_RX p10
 #endif
 
 // Global pointer to can bus object
@@ -25,7 +32,7 @@ extern CAN* canBus;
 
 // Number of 6813 chips on isospi bus
 #ifndef NUM_CHIPS
-#define NUM_CHIPS 2
+#define NUM_CHIPS 6
 #endif
 
 // Nominal range of the LEM sensor
@@ -35,11 +42,11 @@ extern CAN* canBus;
 
 // Chip number for where the LEM is plugged in, 0 indexed
 #ifndef ISENSE_LOCATION
-#define ISENSE_LOCATION 1
+#define ISENSE_LOCATION 5
 #endif
 
 #ifndef CELL_SENSE_FREQUENCY
-#define CELL_SENSE_FREQUENCY 5
+#define CELL_SENSE_FREQUENCY 10
 #endif
 
 #ifndef MAIN_PERIOD
@@ -61,9 +68,19 @@ extern CAN* canBus;
 
 const int BMS_CELL_MAP[18] = {0, 1, 2, 3, 4, -1, 5, 6, 7, 8, 9, -1, 10, 11, 12, 13, -1, -1};
 
-enum thread_message {INIT_ALL, NEW_CELL_DATA, // main
-  BMS_INIT, BMS_READ, ENABLE_BALANCING, DISABLE_BALANCING, // bms thread
-  DATA_INIT, DATA_DATA, DATA_SUMMARY};    // data thread
+enum thread_message {INIT_ALL, NEW_CELL_DATA, BATT_ERR, // to main
+  BMS_INIT, BMS_READ, ENABLE_BALANCING, DISABLE_BALANCING, // to bms thread
+  DATA_INIT, DATA_DATA, DATA_SUMMARY, DATA_ERR};    // to data thread
+
+// Value for 100% on the bar on the display
+#ifndef DISP_FULL_SCALE
+#define DISP_FULL_SCALE 80000
+#endif
+
+// Divide out for 20 characters width
+#ifndef DISP_PER_BOX
+#define DISP_PER_BOX (DISP_FULL_SCALE/20)
+#endif
 
 
 //

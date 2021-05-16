@@ -41,6 +41,8 @@ class DataThread {
       t.start();
       uint32_t prevTime = 0;
 
+      uint32_t errCount = 0;
+
       while (true) {
         std::stringstream printbuff;
         if (!m_inbox->empty()) {
@@ -54,20 +56,55 @@ class DataThread {
             uint32_t startTime = t.read_ms();
             switch(msg->msg_event) {
               case DATA_INIT:
-                //std::cout << "Data thread received init\n";
+                {
+                  //std::cout << "Data thread received init\n";
 
-                // Print CSV header
-                printbuff << "time_millis,packVoltage,totalCurrent,kW";
-                for (uint16_t i = 0; i < NUM_CHIPS/2; i++) {
-                  for (uint16_t j = 1; j <= NUM_CELLS_PER_CHIP*2; j++) {
-                    printbuff << ",V_" << (char)('A'+i) << j;
+                  // Print CSV header
+                  printbuff << "time_millis,packVoltage,totalCurrent,kW";
+                  for (uint16_t i = 0; i < NUM_CHIPS/2; i++) {
+                    for (uint16_t j = 1; j <= NUM_CELLS_PER_CHIP*2; j++) {
+                      printbuff << ",V_" << (char)('A'+i) << j;
+                    }
                   }
+                  for (uint16_t i = 0; i < NUM_CHIPS; i++) {
+                    printbuff << ",T_" << (char)('A'+(i/2)) << (i%2)+1;
+                  }
+                  printbuff << '\n';
+                  std::cout << printbuff.str();
+                  //serial2->printf(printbuff.str().c_str());
+
+                  // Init display
+                  displayserial->putc(0x0C);
+                  ThisThread::sleep_for(5);
+                  displayserial->putc(0x11); // Backlight on
+                  displayserial->putc(0x16); // Cursor off, no blink
+
+                  // add custom characters
+                  uint8_t customchar = 0b00010000;
+                  uint8_t charindex = 0xf8;
+                  displayserial->putc(0x94);// move to second row to test characters
+                  displayserial->putc(charindex);
+                  for (uint8_t j = 0; j < 8; j++) {
+                    displayserial->putc(0);
+                  }
+                  charindex++;
+                  for (uint8_t i = 0; i < 5; i++) {
+                    displayserial->putc(charindex);
+                    for (uint8_t j = 0; j < 8; j++) {
+                      displayserial->putc(customchar);
+                    }
+                    customchar |= (customchar >> 1);
+                    charindex++;
+
+                    //std::cout << "sending custom char " << (int)i << '\n';
+                    //displayserial->putc((int)i);
+                  }
+                  /*for (uint8_t i = 0; i < 6; i++) {
+                    displayserial->putc(i);
+                  }*/
+
+                  //displayserial->putc(4);
                 }
-                for (uint16_t i = 0; i < NUM_CHIPS; i++) {
-                  printbuff << ",T_" << (char)('A'+(i/2)) << (i%2)+1;
-                }
-                printbuff << '\n';
-                serial2->printf(printbuff.str().c_str());
                 break;
               case DATA_DATA:
                 {
@@ -82,18 +119,19 @@ class DataThread {
                     printbuff << ',' << m_data->allTemperatures[i];
                   }
                   printbuff << '\n';
-                  serial2->printf(printbuff.str().c_str());
+                  std::cout << printbuff.str();
+                  //serial2->printf(printbuff.str().c_str());
                 }
                 break;
               case DATA_SUMMARY:
                 //std::cout << "Data thread received summary\n";
                 {
-                  float totalVoltage_scaled = ((float)m_summary->totalVoltage)/1000.0;
-                  float totalCurrent_scaled = ((float)m_summary->totalCurrent)/1000.0;
+                  /*float totalVoltage_scaled = ((float)m_summary->totalVoltage)/1000.0;
+                  float totalCurrent_scaled = ((float)m_summary->totalCurrent)/1000.0;*/
 
 
 
-                  printbuff << std::fixed << std::setprecision(1) << "Pack Voltage: " << totalVoltage_scaled << "V"  // round to 1 decimal place
+                  /*printbuff << std::fixed << std::setprecision(1) << "Pack Voltage: " << totalVoltage_scaled << "V"  // round to 1 decimal place
                   << " Current: " << totalCurrent_scaled << "A"
                   << "\nPower: " << totalCurrent_scaled * (totalVoltage_scaled) / 1000.0 << "kW"  // scale to kW
                   << "\nMax Cell: " << m_summary->maxVoltage << " " << (char)('A'+(m_summary->maxVoltage_cell/28)) << (m_summary->maxVoltage_cell%28)+1
@@ -102,8 +140,45 @@ class DataThread {
                   << "\nMax Temp: " << m_summary->maxTemp << " " << (char)('A'+(m_summary->maxTemp_box/2)) << (m_summary->maxTemp_box%2)+1
                   << " Min Temp: " << m_summary->minTemp << " " << (char)('A'+(m_summary->minTemp_box/2)) << (m_summary->minTemp_box%2)+1;
                   printbuff << "\n\n";
-                  std::cout << printbuff.str();
+                  std::cout << printbuff.str();*/
+                  printbuff << setw(3) << m_summary->totalCurrent/1000 << "A " << setw(3) << m_summary->totalVoltage/1000 << "V " 
+                  << "\r-:" << setw(3) << m_summary->minVoltage/10 << " +:" << setw(3) << m_summary->maxVoltage/10
+                  << " A:" << setw(3) << m_summary->totalVoltage/(NUM_CELLS_PER_CHIP*NUM_CHIPS)/10
+                  /*<< "\r " << (char)('A'+(m_summary->maxVoltage_cell/28)) << setw(2) << (m_summary->maxVoltage_cell%28)+1
+                  << " " << (char)('A'+(m_summary->maxVoltage_cell/28)) << setw(2) << (m_summary->maxVoltage_cell%28)+1*/
+                  << "\r+: " << setw(2) << (int)round(m_summary->maxTemp) << " " << (char)('A'+(m_summary->maxTemp_box/2)) << (m_summary->maxTemp_box%2)+1
+                  << " -: " << setw(2) << (int)round(m_summary->minTemp) << " " << (char)('A'+(m_summary->minTemp_box/2)) << (m_summary->minTemp_box%2)+1;
+
+
                   //serial2->printf(printbuff.str().c_str());
+                  uint8_t barbuff[20] = {0}; //first row for bar
+
+                  int64_t power = m_summary->totalCurrent*(int32_t)m_summary->totalVoltage/1000000;
+                  uint8_t fullcount = power/DISP_PER_BOX; //80kw/20 character width;
+                  for (uint8_t i = 0; i < fullcount; i++) {
+                    barbuff[i] = 5;
+                  }
+                  // Scale remainder 0-5 for end of the bar
+                  uint8_t finalchar = (uint8_t)(((power+DISP_PER_BOX)%DISP_PER_BOX)/(DISP_PER_BOX/5));
+                  barbuff[fullcount] = finalchar;
+                  if (errCount == 800) {
+                    errCount = 0;
+                  }
+
+                  displayserial->putc(0x80); // move to 0,0
+                  displayserial->write(barbuff, 20);
+                  displayserial->putc(0x94); // move to 1,0
+                  displayserial->printf(printbuff.str().c_str());
+                  //std::cout << m_summary->totalCurrent << "A " << m_summary->totalVoltage/1000 << "V " << "Calc: " << m_summary->totalCurrent*(int32_t)m_summary->totalVoltage/1000000 << " " << power/1000 << "kW fullcount: " << (int)fullcount << " final: " << (int)finalchar << " time: " <<  t.read_ms()-startTime << '\n';
+                }
+                break;
+              case DATA_ERR:
+                std::cout << "Data thread received error!\n";
+                {
+                  errCount++;
+
+
+
                 }
                 break;
               default:

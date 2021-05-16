@@ -18,6 +18,7 @@
 
 Serial* serial;
 Serial* serial2;
+Serial* displayserial;
 CAN* canBus;
 
 batterycomm_t data_main;
@@ -134,6 +135,13 @@ int main() {
               inbox_data.put(msg_out);
             }
             break;
+          case BATT_ERR:
+            {
+              mail_t *msg_out = inbox_data.alloc();
+              msg_out->msg_event = DATA_ERR;
+              inbox_data.put(msg_out);              
+            }
+            break;
           default:
             std::cout << "Invalid message received in Main thread!\n";
             break;
@@ -150,7 +158,8 @@ int main() {
 void initIO() {
   serial = new Serial(USBTX, USBRX, 230400);
 
-  serial2 = new Serial(PIN_SERIAL2_TX, PIN_SERIAL2_RX, 230400);
+  //serial2 = new Serial(PIN_SERIAL2_TX, PIN_SERIAL2_RX, 230400);
+  displayserial = new Serial(PIN_DISPLAY_TX, PIN_DISPLAY_RX, 19200);
   //serial->printf("INIT\n");
   
   canBus = new CAN(PIN_CAN_TX, PIN_CAN_RX, CAN_FREQUENCY);
