@@ -151,22 +151,34 @@ class DataThread {
 
 
                   //serial2->printf(printbuff.str().c_str());
-                  uint8_t barbuff[20] = {0}; //first row for bar
 
-                  int64_t power = m_summary->totalCurrent*(int32_t)m_summary->totalVoltage/1000000;
+
+                  displayserial->putc(0x80); // move to 0,0
+
+                  int64_t power = m_summary->totalCurrent*((int64_t)m_summary->totalVoltage)/1000000;
+                  // Guards display overflow
+                  if (power < 0) {
+                    power = 0;
+                  }
                   uint8_t fullcount = power/DISP_PER_BOX; //80kw/20 character width;
+                  // Limits bar to not go further than it's supposed to
+                  if (fullcount > 19) {
+                    fullcount = 19;
+                  }
                   for (uint8_t i = 0; i < fullcount; i++) {
-                    barbuff[i] = 5;
+                    displayserial->putc(0x5);
                   }
                   // Scale remainder 0-5 for end of the bar
                   uint8_t finalchar = (uint8_t)(((power+DISP_PER_BOX)%DISP_PER_BOX)/(DISP_PER_BOX/5));
-                  barbuff[fullcount] = finalchar;
+                  displayserial->putc(finalchar);
                   if (errCount == 800) {
                     errCount = 0;
                   }
 
-                  displayserial->putc(0x80); // move to 0,0
-                  displayserial->write(barbuff, 20);
+                  for (uint8_t i = 0; i < (19 - fullcount); i++) {
+                    displayserial->putc(0);
+                  }
+
                   displayserial->putc(0x94); // move to 1,0
                   displayserial->printf(printbuff.str().c_str());
                   //std::cout << m_summary->totalCurrent << "A " << m_summary->totalVoltage/1000 << "V " << "Calc: " << m_summary->totalCurrent*(int32_t)m_summary->totalVoltage/1000000 << " " << power/1000 << "kW fullcount: " << (int)fullcount << " final: " << (int)finalchar << " time: " <<  t.read_ms()-startTime << '\n';
