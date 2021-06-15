@@ -53,6 +53,7 @@ class BMSThread {
   bool m_discharging = true;
   uint16_t voltages[NUM_CHIPS][18];
   uint16_t gpio_adc[NUM_CHIPS][2];
+  //uint8_t dieTemps[NUM_CHIPS];
 
   float currentZero;
   bool currentZeroed = false;
@@ -72,7 +73,7 @@ class BMSThread {
   void threadWorker() {
 
     uint8_t balance_index = 0;
-    uint16_t prevMinVoltage = 0;
+    uint16_t prevMinVoltage = BMS_FAULT_VOLTAGE_THRESHOLD_HIGH;
 
     /*std::cout << "time_millis,totalCurrent";
     for (uint16_t i = 0; i < NUM_CHIPS/2; i++) {
@@ -105,6 +106,7 @@ class BMSThread {
       uint8_t maxTemp_box = 255;
       unsigned int totalVoltage = 0;
       int totalCurrent = 0;
+      m_batterydata->numBalancing = 0;
       //systime_t timeStart = chVTGetSystemTime();
       // Should be changed to ticker
 
@@ -152,8 +154,7 @@ class BMSThread {
       m_batterysummary->timestamp = t.read_ms();
       m_6813bus->unmuteDischarge();
 
-      /*LTC6813::Status statuses[NUM_CHIPS];
-      m_6813bus->getStatus(statuses);*/
+      m_6813bus->getDieTemps(m_batterydata->dieTemps);
 
 
 
@@ -180,7 +181,7 @@ class BMSThread {
         m_mutex->lock();
         for (unsigned int i = 0; i < NUM_CHIPS; i++) {
 
-          //serial->printf("Chip %d:\n", i);
+          //serial->printf("Chip %d: Die Temp: %d\n", i, dieTemps[i]);
 
           /*std::cout << "Sum: " << statuses[i].sumAllCells
           << "\nInternal Temp: " << statuses[i].internalTemperature
@@ -230,10 +231,11 @@ class BMSThread {
                 if((voltage > prevMinVoltage) && (voltage - prevMinVoltage > BMS_DISCHARGE_THRESHOLD)) {
                   // Discharge
 
-                  serial->printf("DISCHARGE CHIP: %d CELL: %d: %dmV (%dmV)\n", i, index, voltage, (voltage - prevMinVoltage));
+                  //serial->printf("DISCHARGE CHIP: %d CELL: %d: %dmV (%dmV)\n", i, index, voltage, (voltage - prevMinVoltage));
 
                   // Enable discharging
                   conf.dischargeState.value |= (1 << j);
+                  m_batterydata->numBalancing++;
                 } else {
                   // Disable discharging
                   conf.dischargeState.value &= ~(1 << j);

@@ -69,7 +69,10 @@ class DataThread {
                   for (uint16_t i = 0; i < NUM_CHIPS; i++) {
                     printbuff << ",T_" << (char)('A'+(i/2)) << (i%2)+1;
                   }
-                  printbuff << '\n';
+                  for (uint16_t i = 0; i < NUM_CHIPS; i++) {
+                    printbuff << ",dieTemp_" << (char)('A'+(i/2)) << (i%2)+1;
+                  }
+                  printbuff << ",numBalancing\n";
                   std::cout << printbuff.str();
                   //serial2->printf(printbuff.str().c_str());
 
@@ -118,6 +121,10 @@ class DataThread {
                   for (uint16_t i = 0; i < NUM_CHIPS; i++) {
                     printbuff << ',' << m_data->allTemperatures[i];
                   }
+                  for (uint16_t i = 0; i < NUM_CHIPS; i++) {
+                    printbuff << ',' << (int)m_data->dieTemps[i];
+                  }
+                  printbuff << ',' << (int)m_data->numBalancing;
                   printbuff << '\n';
                   std::cout << printbuff.str();
                   //serial2->printf(printbuff.str().c_str());
@@ -127,11 +134,11 @@ class DataThread {
                 //std::cout << "Data thread received summary\n";
                 {
                   /*float totalVoltage_scaled = ((float)m_summary->totalVoltage)/1000.0;
-                  float totalCurrent_scaled = ((float)m_summary->totalCurrent)/1000.0;*/
+                  float totalCurrent_scaled = ((float)m_summary->totalCurrent)/1000.0;
 
 
 
-                  /*printbuff << std::fixed << std::setprecision(1) << "Pack Voltage: " << totalVoltage_scaled << "V"  // round to 1 decimal place
+                  printbuff << std::fixed << std::setprecision(1) << "Pack Voltage: " << totalVoltage_scaled << "V"  // round to 1 decimal place
                   << " Current: " << totalCurrent_scaled << "A"
                   << "\nPower: " << totalCurrent_scaled * (totalVoltage_scaled) / 1000.0 << "kW"  // scale to kW
                   << "\nMax Cell: " << m_summary->maxVoltage << " " << (char)('A'+(m_summary->maxVoltage_cell/28)) << (m_summary->maxVoltage_cell%28)+1
@@ -140,7 +147,11 @@ class DataThread {
                   << "\nMax Temp: " << m_summary->maxTemp << " " << (char)('A'+(m_summary->maxTemp_box/2)) << (m_summary->maxTemp_box%2)+1
                   << " Min Temp: " << m_summary->minTemp << " " << (char)('A'+(m_summary->minTemp_box/2)) << (m_summary->minTemp_box%2)+1;
                   printbuff << "\n\n";
-                  std::cout << printbuff.str();*/
+                  std::cout << printbuff.str();
+                  printbuff.str("");*/
+
+
+
                   printbuff << setw(3) << m_summary->totalCurrent/1000 << "A " << setw(3) << m_summary->totalVoltage/1000 << "V " 
                   << "\r-:" << setw(3) << m_summary->minVoltage/10 << " +:" << setw(3) << m_summary->maxVoltage/10
                   << " A:" << setw(3) << m_summary->totalVoltage/(NUM_CELLS_PER_CHIP*NUM_CHIPS)/10

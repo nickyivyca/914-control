@@ -274,6 +274,23 @@ void LTC6813Bus::getStatus(LTC6813::Status statuses[NUM_CHIPS]) {
     statuses[k].thermalShutDown = rxbuf[1][k][5] & 1;
   }
 }
+void LTC6813Bus::getDieTemps(uint8_t dieTemps[NUM_CHIPS]) {
+  //Timer t;
+  //t.start();
+  m_bus.sendCommandPollADC(LTC681xBus::buildBroadcastCommand
+    (StartStatusADC(AdcMode::k7k, StatusGroupSelection::k2)));
+
+  // [2 status registers][each chip in chain][Register of 6 Bytes + PEC]
+  uint8_t rxbuf[NUM_CHIPS][8];
+
+  m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadStatusGroupA()), 
+    rxbuf);
+
+  for (unsigned int k = 0; k < NUM_CHIPS; k++) { // iterate over each chip's worth of data
+    uint16_t raw_temp = rxbuf[k][2] | (rxbuf[k][3] << 8);
+    dieTemps[k] = (uint8_t)(raw_temp * (0.0001)/(0.0076) - 276.0);
+  }
+}
 
 void LTC6813Bus::muteDischarge() {
   m_bus.sendCommand(LTC681xBus::buildBroadcastCommand(MuteDischarge()));

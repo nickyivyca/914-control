@@ -245,7 +245,8 @@ void LTC681xBus::sendCommandWholeChain(Command txCmd, uint8_t txData[NUM_CHIPS][
 //  wakeupSpi();
   acquireSpi();
   m_spiDriver->write((const char *)cmd, 4, NULL, 0);
-  for (uint8_t i = 0; i < NUM_CHIPS; i++) {
+  // Writing on a daisy chain means the last chip in the chain gets the first data sent - reverse here to keep the rest of the software sane
+  for (int8_t i = NUM_CHIPS; i >= 0; i--) {
     m_spiDriver->write((const char *)data[i], 8, NULL, 0);
   }
   releaseSpi();
