@@ -177,3 +177,16 @@ class StartCombinedADC : public LTC681xCommand {
     return 0x046F | ((uint16_t)adcMode << 7);
   }
 };
+
+class MuteDischarge : public LTC681xCommand {
+ public:
+  uint16_t toValue() const {
+    return 0x28;
+  }
+};
+class UnmuteDischarge : public LTC681xCommand {
+ public:
+  uint16_t toValue() const {
+    return 0x29;
+  }
+};

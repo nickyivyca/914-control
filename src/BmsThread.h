@@ -50,7 +50,7 @@ class BMSThread {
   batterydata_t* m_batterydata;
   batterysummary_t* m_batterysummary;
   //std::vector<LTC6813> m_chips;
-  bool m_discharging = false;
+  bool m_discharging = true;
   uint16_t voltages[NUM_CHIPS][18];
   uint16_t gpio_adc[NUM_CHIPS][2];
 
@@ -145,10 +145,12 @@ class BMSThread {
       }
 #endif
       m_bus->wakeupChainSpi();
+      m_6813bus->muteDischarge();
       m_6813bus->updateConfig();
       uint8_t pecStatus = m_6813bus->getCombined(voltages, gpio_adc);
       m_batterydata->timestamp = t.read_ms();
       m_batterysummary->timestamp = t.read_ms();
+      m_6813bus->unmuteDischarge();
 
       /*LTC6813::Status statuses[NUM_CHIPS];
       m_6813bus->getStatus(statuses);*/
@@ -228,7 +230,7 @@ class BMSThread {
                 if((voltage > prevMinVoltage) && (voltage - prevMinVoltage > BMS_DISCHARGE_THRESHOLD)) {
                   // Discharge
 
-                  serial->printf("DISCHARGE CELL %d: %dmV (%dmV)\n", index, voltage, (voltage - prevMinVoltage));
+                  serial->printf("DISCHARGE CHIP: %d CELL: %d: %dmV (%dmV)\n", i, index, voltage, (voltage - prevMinVoltage));
 
                   // Enable discharging
                   conf.dischargeState.value |= (1 << j);
@@ -318,6 +320,8 @@ class BMSThread {
 
         m_batterydata->totalCurrent = totalCurrent;
         m_batterydata->packVoltage = totalVoltage;
+
+        prevMinVoltage = minVoltage;
 
         m_mutex->unlock();
 

@@ -275,6 +275,12 @@ void LTC6813Bus::getStatus(LTC6813::Status statuses[NUM_CHIPS]) {
   }
 }
 
+void LTC6813Bus::muteDischarge() {
+  m_bus.sendCommand(LTC681xBus::buildBroadcastCommand(MuteDischarge()));
+}
+void LTC6813Bus::unmuteDischarge() {
+  m_bus.sendCommand(LTC681xBus::buildBroadcastCommand(UnmuteDischarge()));
+}
 /*uint16_t *LTC6813::getGpioPin(GpioSelection pin) {
   auto cmd = StartGpioADC(AdcMode::k7k, pin);
   m_bus.sendCommand(LTC681xBus::buildBroadcastCommand(cmd));
