@@ -50,7 +50,7 @@ class BMSThread {
   batterydata_t* m_batterydata;
   batterysummary_t* m_batterysummary;
   //std::vector<LTC6813> m_chips;
-  bool m_discharging = true;
+  bool m_discharging = false;
   uint16_t voltages[NUM_CHIPS][18];
   uint16_t gpio_adc[NUM_CHIPS][2];
   //uint8_t dieTemps[NUM_CHIPS];
@@ -107,6 +107,7 @@ class BMSThread {
       unsigned int totalVoltage = 0;
       int totalCurrent = 0;
       m_batterydata->numBalancing = 0;
+      m_batterysummary->joules = 0;
       //systime_t timeStart = chVTGetSystemTime();
       // Should be changed to ticker
 
@@ -319,6 +320,9 @@ class BMSThread {
         m_batterysummary->maxTemp_box = maxTemp_box;
         m_batterysummary->totalCurrent = totalCurrent;
         m_batterysummary->totalVoltage = totalVoltage;
+
+        m_batterysummary->joules += ((totalVoltage * totalCurrent)/1000000)/CELL_SENSE_FREQUENCY;
+        m_batterydata->joules = m_batterysummary->joules;
 
         m_batterydata->totalCurrent = totalCurrent;
         m_batterydata->packVoltage = totalVoltage;

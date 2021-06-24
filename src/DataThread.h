@@ -60,7 +60,7 @@ class DataThread {
                   //std::cout << "Data thread received init\n";
 
                   // Print CSV header
-                  printbuff << "time_millis,packVoltage,totalCurrent,kW";
+                  printbuff << "time_millis,packVoltage,totalCurrent,kW,Whr";
                   for (uint16_t i = 0; i < NUM_CHIPS/2; i++) {
                     for (uint16_t j = 1; j <= NUM_CELLS_PER_CHIP*2; j++) {
                       printbuff << ",V_" << (char)('A'+i) << j;
@@ -114,7 +114,8 @@ class DataThread {
                   float totalCurrent_scaled = ((float)m_data->totalCurrent)/1000.0;
                   //std::cout << "Data thread received full data\n";
                   // Print line of CSV data
-                  printbuff << std::fixed << std::setprecision(1) << m_data->timestamp << ',' << m_data->packVoltage/1000.0 << ',' << totalCurrent_scaled << ',' << totalCurrent_scaled * m_data->packVoltage / 1000000.0;
+                  printbuff << std::fixed << std::setprecision(1) << m_data->timestamp << ',' << m_data->packVoltage/1000.0 
+                  << ',' << totalCurrent_scaled << ',' << totalCurrent_scaled * m_data->packVoltage / 1000000.0 << ',' << m_data->joules/3600;
                   for (uint16_t i = 0; i < NUM_CHIPS * NUM_CELLS_PER_CHIP; i++) {
                     printbuff << ',' << m_data->allVoltages[i];
                   }
@@ -150,9 +151,10 @@ class DataThread {
                   std::cout << printbuff.str();
                   printbuff.str("");*/
 
-
+                  int64_t wh = m_summary->joules/3600;
 
                   printbuff << setw(3) << m_summary->totalCurrent/1000 << "A " << setw(3) << m_summary->totalVoltage/1000 << "V " 
+                  << setw(2) << wh/1000 << "." << (wh%1000)/100
                   << "\r-:" << setw(3) << m_summary->minVoltage/10 << " +:" << setw(3) << m_summary->maxVoltage/10
                   << " A:" << setw(3) << m_summary->totalVoltage/(NUM_CELLS_PER_CHIP*NUM_CHIPS)/10
                   /*<< "\r " << (char)('A'+(m_summary->maxVoltage_cell/28)) << setw(2) << (m_summary->maxVoltage_cell%28)+1

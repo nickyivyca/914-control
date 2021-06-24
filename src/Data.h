@@ -15,6 +15,7 @@ typedef struct {
   int totalCurrent;
   uint32_t timestamp;
   unsigned int packVoltage;
+  int64_t joules;
 } batterydata_t;
 
 typedef struct {
@@ -28,6 +29,7 @@ typedef struct {
   uint8_t maxTemp_box;
   int totalCurrent;
   unsigned int totalVoltage;
+  int64_t joules;
   uint32_t timestamp;
 
 } batterysummary_t;
