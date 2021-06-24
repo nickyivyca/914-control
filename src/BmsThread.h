@@ -89,6 +89,7 @@ class BMSThread {
     t.start();
 
     uint32_t prevTime = 0;
+    m_batterysummary->joules = 0;
 
 
 
@@ -107,7 +108,6 @@ class BMSThread {
       unsigned int totalVoltage = 0;
       int totalCurrent = 0;
       m_batterydata->numBalancing = 0;
-      m_batterysummary->joules = 0;
       //systime_t timeStart = chVTGetSystemTime();
       // Should be changed to ticker
 
@@ -321,7 +321,7 @@ class BMSThread {
         m_batterysummary->totalCurrent = totalCurrent;
         m_batterysummary->totalVoltage = totalVoltage;
 
-        m_batterysummary->joules += ((totalVoltage * totalCurrent)/1000000)/CELL_SENSE_FREQUENCY;
+        m_batterysummary->joules += ((totalCurrent/1000) * ((int32_t)(totalVoltage/1000))/CELL_SENSE_FREQUENCY);
         m_batterydata->joules = m_batterysummary->joules;
 
         m_batterydata->totalCurrent = totalCurrent;
