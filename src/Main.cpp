@@ -1,4 +1,5 @@
 #include "config.h"
+#include "pinout.h"
 
 #include <array>
 #include <initializer_list>
@@ -17,9 +18,19 @@
 
 
 Serial* serial;
-Serial* serial2;
 Serial* displayserial;
 CAN* canBus;
+
+DigitalOut* led1;
+DigitalOut* led2;
+DigitalOut* led3;
+DigitalOut* led4;
+DigitalOut* DO_BattContactor;
+DigitalOut* DO_BattContactor2;
+DigitalOut* DO_DriveEnable;
+DigitalOut* DO_ChargeEnable;
+
+DigitalIn* DI_ChargeSwitch;
 
 batterycomm_t data_main;
 batterycomm_t data_bms;
@@ -35,6 +46,8 @@ int main() {
   // Init all io pins
   initIO();
 
+  uint8_t blink = 0;
+
   //ThisThread::sleep_for(1000);
 
   SPI* spiDriver = new SPI(PIN_6820_SPI_MOSI,
@@ -49,7 +62,6 @@ int main() {
   BMSThread bmsThread(&inbox_main, &inbox_bms, &ltcBus, &ltc6813Bus, &data_bms, CELL_SENSE_FREQUENCY);
   DataThread dataThread(&inbox_main, &inbox_data, &data_data);
 
-  DigitalOut led(LED1);
   osThreadSetPriority(osThreadGetId(), osPriorityHigh7);
   // Flash LEDs to indicate startup
   /*for (int i = 0; i < 7; i++) {
@@ -151,6 +163,15 @@ int main() {
       }
     }
     //std::cout << "Looping main while " << (MAIN_PERIOD - (t.read_ms()%MAIN_PERIOD)) << '\n';
+
+    /*blink++;
+    std::cout << "blink: " << (int)blink << " Output driven\n";
+    *led4 = blink%2;
+    *DO_BattContactor = blink%2;*/
+
+    /*std::cout << "Charge switch status: " << (int)*DI_ChargeSwitch << "\n";
+    *led2 = *DI_ChargeSwitch;*/
+
     ThisThread::sleep_for(MAIN_PERIOD - (t.read_ms()%MAIN_PERIOD));
   }
 }
@@ -163,4 +184,19 @@ void initIO() {
   //serial->printf("INIT\n");
   
   canBus = new CAN(PIN_CAN_TX, PIN_CAN_RX, CAN_FREQUENCY);
+  led1 = new DigitalOut(LED1);
+  led2 = new DigitalOut(LED2);
+  led3 = new DigitalOut(LED3);
+  led4 =  new DigitalOut(LED4);
+  DO_BattContactor = new DigitalOut(PIN_DO_BATTCONTACTOR);
+  DO_BattContactor2 = new DigitalOut(PIN_DO_BATTCONTACTOR2);
+  DO_DriveEnable = new DigitalOut(PIN_DO_DRIVEENABLE);
+  DO_ChargeEnable = new DigitalOut(PIN_DO_CHARGEENABLE);
+
+  DI_ChargeSwitch = new DigitalIn(PIN_DI_CHARGESWITCH);
+
+  *DO_BattContactor = 0;
+  *DO_BattContactor2 = 0;
+  *DO_DriveEnable = 0;
+  *DO_ChargeEnable = 0;
 }

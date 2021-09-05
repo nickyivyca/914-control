@@ -72,7 +72,7 @@ class DataThread {
                   for (uint16_t i = 0; i < NUM_CHIPS; i++) {
                     printbuff << ",dieTemp_" << (char)('A'+(i/2)) << (i%2)+1;
                   }
-                  printbuff << ",numBalancing\n";
+                  printbuff << ",numBalancing,errCount\n";
                   std::cout << printbuff.str();
                   //serial2->printf(printbuff.str().c_str());
 
@@ -126,6 +126,7 @@ class DataThread {
                     printbuff << ',' << (int)m_data->dieTemps[i];
                   }
                   printbuff << ',' << (int)m_data->numBalancing;
+                  printbuff << ',' << (int)errCount;
                   printbuff << '\n';
                   std::cout << printbuff.str();
                   //serial2->printf(printbuff.str().c_str());
@@ -198,7 +199,7 @@ class DataThread {
                 }
                 break;
               case DATA_ERR:
-                std::cout << "Data thread received error!\n";
+                //std::cout << "Data thread received error!\n";
                 {
                   errCount++;
 

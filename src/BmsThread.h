@@ -11,9 +11,22 @@
 #include "rtos.h"
 
 #include "config.h"
+#include "pinout.h"
 #include "LTC6813.h"
 #include "LTC681xBus.h"
 #include "Data.h"
+
+
+
+/*DigitalOut* DO_BattContactor;
+DigitalOut* DO_ChargeEnable;
+
+DigitalOut* led1;
+DigitalOut* led2;
+DigitalOut* led3;
+DigitalOut* led4;
+
+DigitalIn* DI_ChargeSwitch;*/
 
 class BMSThread {
  public:
@@ -49,6 +62,7 @@ class BMSThread {
   Mutex* m_mutex;
   batterydata_t* m_batterydata;
   batterysummary_t* m_batterysummary;
+
   //std::vector<LTC6813> m_chips;
   bool m_discharging = false;
   uint16_t voltages[NUM_CHIPS][18];
@@ -57,6 +71,9 @@ class BMSThread {
 
   float currentZero;
   bool currentZeroed = false;
+  bool startedUp = false;
+  bool voltagecheckOK = true;
+  bool faultThrown = false;
 
   enum state {INIT, RUN, FAULT};
 
@@ -214,21 +231,32 @@ class BMSThread {
               //totalVoltage += voltage;
               //serial->printf("%dmV ", voltage);
 
-              // if (voltage >= BMS_FAULT_VOLTAGE_THRESHOLD_HIGH) {
-              //   // Set fault line
-              //   serial->printf("***** BMS LOW VOLTAGE FAULT *****\nVoltage at %d\n\n", voltage);
-              //   throwBmsFault();
-              // }
-              // if (voltage <= BMS_FAULT_VOLTAGE_THRESHOLD_LOW) {
-              //   // Set fault line
-              //   serial->printf("***** BMS HIGH VOLTAGE FAULT *****\nVoltage at %d\n\n", voltage);
-              //   throwBmsFault();
-              // }
+              if (voltage >= BMS_FAULT_VOLTAGE_THRESHOLD_HIGH) {
+                // Set fault line
+                //serial->printf("***** BMS LOW VOLTAGE FAULT *****\nVoltage at %d\n\n", voltage);
+                //throwBmsFault();
+                voltagecheckOK = false;
+                *DO_ChargeEnable = 0;
+                *led2 = 0;
+                *led4 = 1;
+                faultThrown = true;
+              }
+              if (voltage <= BMS_FAULT_VOLTAGE_THRESHOLD_LOW) {
+                // Set fault line
+                //serial->printf("***** BMS HIGH VOLTAGE FAULT *****\nVoltage at %d\n\n", voltage);
+                //throwBmsFault();
+                voltagecheckOK = false;
+                *DO_ChargeEnable = 0;
+                faultThrown = true;
+                *led2 = 0;
+                *led4 = 1;
+              }
 
               // Discharge cells if enabled
 
               LTC6813::Configuration& conf = m_6813bus->m_chips[i].getConfig();
-              if(m_discharging) {
+              //if(m_discharging) {
+              if(DI_ChargeSwitch && !faultThrown) {
                 if((voltage > prevMinVoltage) && (voltage - prevMinVoltage > BMS_DISCHARGE_THRESHOLD)) {
                   // Discharge
 
@@ -334,6 +362,27 @@ class BMSThread {
         mail_t *msg = m_outbox->alloc();
         msg->msg_event = NEW_CELL_DATA;
         m_outbox->put(msg);
+
+        *led3 = 0;
+
+        if (!startedUp && voltagecheckOK) {
+          *DO_BattContactor = 1;
+          startedUp = true;
+          *led1 = 1;
+          /**msg = m_outbox->alloc();
+          msg->msg_event = BATT_STARTUP;
+          m_outbox->put(msg);*/
+        }
+        if (*DI_ChargeSwitch && voltagecheckOK && !faultThrown) {
+          *DO_ChargeEnable = 1;
+          *led2 = 1;
+          /**msg = m_outbox->alloc();
+          msg->msg_event = CHARGE_ENABLED;
+          m_outbox->put(msg);*/
+        } else {
+          *DO_ChargeEnable = 0;
+          *led2 = 0;          
+        }
       } else {
         std::bitset<8> pecprint(pecStatus);
 
@@ -341,6 +390,7 @@ class BMSThread {
         msg->msg_event = BATT_ERR;
         m_outbox->put(msg);
         //std::cout << "PEC error! " << pecprint << '\n';
+        *led3 = 1;
       }
 
 
