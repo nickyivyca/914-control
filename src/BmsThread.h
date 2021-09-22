@@ -64,7 +64,7 @@ class BMSThread {
   batterysummary_t* m_batterysummary;
 
   //std::vector<LTC6813> m_chips;
-  bool m_discharging = false;
+  bool m_discharging = true;
   uint16_t voltages[NUM_CHIPS][18];
   uint16_t gpio_adc[NUM_CHIPS][2];
   //uint8_t dieTemps[NUM_CHIPS];
@@ -82,10 +82,11 @@ class BMSThread {
 
 
   void throwBmsFault() {
-    //m_discharging = false;
-    //bmsFault->write(0);
-    //chargerControl->write(1);
-
+    m_discharging = false;
+    *DO_ChargeEnable = 0;
+    faultThrown = true;
+    *led2 = 0;
+    *led4 = 1;
   }
   void threadWorker() {
 
@@ -234,29 +235,20 @@ class BMSThread {
               if (voltage >= BMS_FAULT_VOLTAGE_THRESHOLD_HIGH) {
                 // Set fault line
                 //serial->printf("***** BMS LOW VOLTAGE FAULT *****\nVoltage at %d\n\n", voltage);
-                //throwBmsFault();
+                throwBmsFault();
                 voltagecheckOK = false;
-                *DO_ChargeEnable = 0;
-                *led2 = 0;
-                *led4 = 1;
-                faultThrown = true;
               }
               if (voltage <= BMS_FAULT_VOLTAGE_THRESHOLD_LOW) {
                 // Set fault line
                 //serial->printf("***** BMS HIGH VOLTAGE FAULT *****\nVoltage at %d\n\n", voltage);
-                //throwBmsFault();
+                throwBmsFault();
                 voltagecheckOK = false;
-                *DO_ChargeEnable = 0;
-                faultThrown = true;
-                *led2 = 0;
-                *led4 = 1;
               }
 
               // Discharge cells if enabled
 
               LTC6813::Configuration& conf = m_6813bus->m_chips[i].getConfig();
-              //if(m_discharging) {
-              if(DI_ChargeSwitch && !faultThrown) {
+              if(*DI_ChargeSwitch && !faultThrown && m_discharging) {
                 if((voltage > prevMinVoltage) && (voltage - prevMinVoltage > BMS_DISCHARGE_THRESHOLD)) {
                   // Discharge
 
@@ -316,6 +308,10 @@ class BMSThread {
                 if (steinhart > maxTemp) {
                   maxTemp = steinhart;
                   maxTemp_box = j + i;
+                }
+                // max temp check
+                if (steinhart > BMS_TEMPERATURE_THRESHOLD && *DI_ChargeSwitch) {
+                  throwBmsFault();
                 }
               }
 

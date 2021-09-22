@@ -79,3 +79,8 @@ enum thread_message {INIT_ALL, NEW_CELL_DATA, BATT_ERR, BATT_STARTUP, CHARGE_ENA
 #ifndef BMS_DISCHARGE_THRESHOLD
 #define BMS_DISCHARGE_THRESHOLD 15
 #endif
+
+// Overtemp threshold
+#ifndef BMS_TEMPERATURE_THRESHOLD
+#define BMS_TEMPERATURE_THRESHOLD 42 // cell datasheet gives charging range up to 45C
+#endif
