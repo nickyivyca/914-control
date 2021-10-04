@@ -59,7 +59,7 @@ int main() {
   LTC681xBus ltcBus = LTC681xBus(spiDriver);
   LTC6813Bus ltc6813Bus = LTC6813Bus(ltcBus);
 
-  BMSThread bmsThread(&inbox_main, &inbox_bms, &ltcBus, &ltc6813Bus, &data_bms, CELL_SENSE_FREQUENCY);
+  BMSThread bmsThread(&inbox_main, &inbox_bms, &ltcBus, &ltc6813Bus, &data_bms);
   DataThread dataThread(&inbox_main, &inbox_data, &data_data);
 
   osThreadSetPriority(osThreadGetId(), osPriorityHigh7);

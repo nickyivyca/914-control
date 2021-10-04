@@ -24,6 +24,10 @@
 #define CELL_SENSE_FREQUENCY 10
 #endif
 
+#ifndef CELL_SENSE_FREQUENCY_CHARGE
+#define CELL_SENSE_FREQUENCY_CHARGE 2
+#endif
+
 #ifndef MAIN_PERIOD
 #define MAIN_PERIOD 10
 #endif
@@ -77,7 +81,7 @@ enum thread_message {INIT_ALL, NEW_CELL_DATA, BATT_ERR, BATT_STARTUP, CHARGE_ENA
 //
 // Units: millivolts
 #ifndef BMS_DISCHARGE_THRESHOLD
-#define BMS_DISCHARGE_THRESHOLD 15
+#define BMS_DISCHARGE_THRESHOLD 20
 #endif
 
 // Overtemp threshold

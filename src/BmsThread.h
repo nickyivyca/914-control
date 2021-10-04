@@ -31,9 +31,8 @@ DigitalIn* DI_ChargeSwitch;*/
 class BMSThread {
  public:
  BMSThread(Mail<mail_t, MSG_QUEUE_SIZE>* outbox, Mail<mail_t, MSG_QUEUE_SIZE>* inbox, 
-  LTC681xBus* bus, LTC6813Bus* bus_6813, batterycomm_t* datacomm, unsigned int frequency) : 
+  LTC681xBus* bus, LTC6813Bus* bus_6813, batterycomm_t* datacomm) : 
    m_inbox(inbox), m_outbox(outbox), m_bus(bus), m_6813bus(bus_6813) {
-    m_delay = 1000 / frequency;
     //m_chip = new LTC6813(*bus);
     //m_6813bus = new LTC6813Bus(*bus);
     /*for (int i = 0; i < NUM_CHIPS; i++) {
@@ -126,6 +125,9 @@ class BMSThread {
       unsigned int totalVoltage = 0;
       int totalCurrent = 0;
       m_batterydata->numBalancing = 0;
+
+
+      m_delay = *DI_ChargeSwitch? 1000/CELL_SENSE_FREQUENCY_CHARGE : 1000 / CELL_SENSE_FREQUENCY;
       //systime_t timeStart = chVTGetSystemTime();
       // Should be changed to ticker
 
