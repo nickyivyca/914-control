@@ -220,6 +220,21 @@ class BMSThread {
 
             int index = BMS_CELL_MAP[j];
             if (index != -1) {
+              // add 5mV for top of cellbox and bottom of cellbox
+              if ((i%2 && index == 13) || (!i%2 && index == 0)) {
+                voltage += 5;
+              }
+              // add 7 mV for top of cellbox for current sense
+              if (i == ISENSE_LOCATION && index == 13) {
+                voltage += 7;
+              }
+              // adjust for 15mV offset due to current sensor
+              if (i == ISENSE_LOCATION-1 && index == 13) {
+                voltage -= 15;
+              }
+              if (i == ISENSE_LOCATION && index == 0) {
+                voltage += 15;
+              }
               m_batterydata->allVoltages[(NUM_CELLS_PER_CHIP * i) + index] = voltage;
               totalVoltage += voltage;
 

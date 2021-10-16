@@ -81,7 +81,7 @@ enum thread_message {INIT_ALL, NEW_CELL_DATA, BATT_ERR, BATT_STARTUP, CHARGE_ENA
 //
 // Units: millivolts
 #ifndef BMS_DISCHARGE_THRESHOLD
-#define BMS_DISCHARGE_THRESHOLD 20
+#define BMS_DISCHARGE_THRESHOLD 10
 #endif
 
 // Overtemp threshold
