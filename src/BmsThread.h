@@ -53,7 +53,8 @@ class BMSThread {
  private:
   //Thread m_thread(osPriorityHigh, OS_STACK_SIZE*2);
   Thread m_thread;
-  unsigned int m_delay;
+  int m_delay;
+  int m_frequency;
   Mail<mail_t, MSG_QUEUE_SIZE>* m_inbox;
   Mail<mail_t, MSG_QUEUE_SIZE>* m_outbox;
   LTC681xBus* m_bus;
@@ -127,7 +128,8 @@ class BMSThread {
       m_batterydata->numBalancing = 0;
 
 
-      m_delay = *DI_ChargeSwitch? 1000/CELL_SENSE_FREQUENCY_CHARGE : 1000 / CELL_SENSE_FREQUENCY;
+      m_frequency = *DI_ChargeSwitch? CELL_SENSE_FREQUENCY_CHARGE : CELL_SENSE_FREQUENCY;
+      m_delay =  1000/m_frequency;
       //systime_t timeStart = chVTGetSystemTime();
       // Should be changed to ticker
 
@@ -362,7 +364,7 @@ class BMSThread {
         m_batterysummary->totalCurrent = totalCurrent;
         m_batterysummary->totalVoltage = totalVoltage;
 
-        m_batterysummary->joules += ((totalCurrent/1000) * ((int32_t)(totalVoltage/1000))/CELL_SENSE_FREQUENCY);
+        m_batterysummary->joules += ((totalCurrent/1000) * ((int32_t)(totalVoltage/1000))/m_frequency);
         m_batterydata->joules = m_batterysummary->joules;
 
         m_batterydata->totalCurrent = totalCurrent;
