@@ -99,8 +99,7 @@
 // Global pointer to serial object
 //
 // This allows for all files to access the serial output
-extern Serial* serial;
-// extern Serial* displayserial;
+extern MODSERIAL* serial;
 extern MODSERIAL* displayserial;
 
 

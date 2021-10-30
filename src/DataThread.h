@@ -61,11 +61,15 @@ class DataThread {
 
                   // Print CSV header
                   printbuff << "time_millis,packVoltage,totalCurrent,kW,Whr";
+                  serial->printf(printbuff.str().c_str());
+                  printbuff.str(std::string());
                   for (uint16_t i = 0; i < NUM_CHIPS/2; i++) {
                     for (uint16_t j = 1; j <= NUM_CELLS_PER_CHIP*2; j++) {
                       printbuff << ",V_" << (char)('A'+i) << j;
                     }
                   }
+                  serial->printf(printbuff.str().c_str());
+                  printbuff.str(std::string());
                   for (uint16_t i = 0; i < NUM_CHIPS; i++) {
                     printbuff << ",T_" << (char)('A'+(i/2)) << (i%2)+1;
                   }
@@ -73,7 +77,10 @@ class DataThread {
                     printbuff << ",dieTemp_" << (char)('A'+(i/2)) << (i%2)+1;
                   }
                   printbuff << ",numBalancing,errCount\n";
-                  std::cout << printbuff.str();
+
+                  serial->printf(printbuff.str().c_str());
+                  printbuff.str(std::string());
+                  //std::cout << printbuff.str();
                   //serial2->printf(printbuff.str().c_str());
 
                   // Init display
@@ -128,7 +135,10 @@ class DataThread {
                   printbuff << ',' << (int)m_data->numBalancing;
                   printbuff << ',' << (int)errCount;
                   printbuff << '\n';
-                  std::cout << printbuff.str();
+                  //uint32_t curtime = t.read_us();
+                  serial->printf(printbuff.str().c_str());
+                  //std::cout << printbuff.str();
+                  //std::cout << "Print time: " << (t.read_us() - curtime) << "us \n";
                   //serial2->printf(printbuff.str().c_str());
                 }
                 break;
@@ -151,6 +161,7 @@ class DataThread {
                   printbuff << "\n\n";
                   std::cout << printbuff.str();
                   printbuff.str("");*/
+                  //uint32_t curtime = t.read_us();
 
                   int64_t wh = m_summary->joules/3600;
 
@@ -195,6 +206,7 @@ class DataThread {
 
                   displayserial->putc(0x94); // move to 1,0
                   displayserial->printf(printbuff.str().c_str());
+                  //std::cout << "Print time: " << (t.read_us() - curtime) << "us \n";
                   //std::cout << m_summary->totalCurrent << "A " << m_summary->totalVoltage/1000 << "V " << "Calc: " << m_summary->totalCurrent*(int32_t)m_summary->totalVoltage/1000000 << " " << power/1000 << "kW fullcount: " << (int)fullcount << " final: " << (int)finalchar << " time: " <<  t.read_ms()-startTime << '\n';
                 }
                 break;

@@ -19,8 +19,7 @@
 #include "Data.h"
 
 
-Serial* serial;
-//Serial* displayserial;
+MODSERIAL* serial;
 MODSERIAL* displayserial;
 CAN* canBus;
 
@@ -180,11 +179,13 @@ int main() {
 }
 
 void initIO() {
-  serial = new Serial(USBTX, USBRX, 230400);
+  serial = new MODSERIAL(USBTX, USBRX, 1024, 32);
+  serial->baud(230400);
 
   //serial2 = new Serial(PIN_SERIAL2_TX, PIN_SERIAL2_RX, 230400);
-  //displayserial = new Serial(PIN_DISPLAY_TX, PIN_DISPLAY_RX, 19200);
-  displayserial = new MODSERIAL(PIN_DISPLAY_TX, PIN_DISPLAY_RX, 19200);
+  displayserial = new MODSERIAL(PIN_DISPLAY_TX, PIN_DISPLAY_RX);
+  displayserial->baud(19200);
+
   //serial->printf("INIT\n");
   
   canBus = new CAN(PIN_CAN_TX, PIN_CAN_RX, CAN_FREQUENCY);
