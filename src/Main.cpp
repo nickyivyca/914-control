@@ -10,6 +10,8 @@
 #include "mbed.h"
 #include "rtos.h"
 
+#include "MODSERIAL.h"
+
 #include "LTC681xBus.h"
 #include "LTC6813.h"
 #include "BmsThread.h"
@@ -18,7 +20,8 @@
 
 
 Serial* serial;
-Serial* displayserial;
+//Serial* displayserial;
+MODSERIAL* displayserial;
 CAN* canBus;
 
 DigitalOut* led1;
@@ -180,7 +183,8 @@ void initIO() {
   serial = new Serial(USBTX, USBRX, 230400);
 
   //serial2 = new Serial(PIN_SERIAL2_TX, PIN_SERIAL2_RX, 230400);
-  displayserial = new Serial(PIN_DISPLAY_TX, PIN_DISPLAY_RX, 19200);
+  //displayserial = new Serial(PIN_DISPLAY_TX, PIN_DISPLAY_RX, 19200);
+  displayserial = new MODSERIAL(PIN_DISPLAY_TX, PIN_DISPLAY_RX, 19200);
   //serial->printf("INIT\n");
   
   canBus = new CAN(PIN_CAN_TX, PIN_CAN_RX, CAN_FREQUENCY);

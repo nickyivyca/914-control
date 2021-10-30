@@ -2,6 +2,8 @@
 
 #include "mbed.h"
 
+#include "MODSERIAL.h"
+
 #ifndef PIN_SERIAL2_TX
 #define PIN_SERIAL2_TX p9
 #endif
@@ -98,7 +100,8 @@
 //
 // This allows for all files to access the serial output
 extern Serial* serial;
-extern Serial* displayserial;
+// extern Serial* displayserial;
+extern MODSERIAL* displayserial;
 
 
 
