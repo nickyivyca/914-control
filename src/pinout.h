@@ -2,8 +2,6 @@
 
 #include "mbed.h"
 
-#include "MODSERIAL.h"
-
 #ifndef PIN_SERIAL2_TX
 #define PIN_SERIAL2_TX p9
 #endif
@@ -99,8 +97,8 @@
 // Global pointer to serial object
 //
 // This allows for all files to access the serial output
-extern MODSERIAL* serial;
-extern MODSERIAL* displayserial;
+extern BufferedSerial* serial;
+extern BufferedSerial* displayserial;
 
 
 

@@ -3,7 +3,7 @@
 #include "mbed.h"
 #include "rtos.h"
 
-#include "LTC681xBus.h"
+#include "LTC681xChainBus.h"
 
 #include "config.h"
 #include <bitset>
@@ -35,7 +35,7 @@ LTC6813::Configuration &LTC6813::getConfig() { return m_config; }
 
 
 
-LTC6813Bus::LTC6813Bus(LTC681xBus &bus) : m_bus(bus) {};
+LTC6813Bus::LTC6813Bus(LTC681xBus::LTC681xChainBus<N_chips> &bus) : m_bus(bus) {};
 
 void LTC6813Bus::updateConfig() {
 /*#ifdef DEBUGN
@@ -82,11 +82,11 @@ void LTC6813Bus::updateConfig() {
     }
 #endif*/
 
-  LTC681xBus::Command cmd = LTC681xBus::buildBroadcastCommand(WriteConfigurationGroupA());
-  m_bus.sendCommandWholeChain(cmd, configA);
+  LTC681xBus::Command cmd = LTC681xBus::buildChainBusCommand(WriteConfigurationGroupA());
+  m_bus.sendCommand(cmd, configA);
 
-  cmd = LTC681xBus::buildBroadcastCommand(WriteConfigurationGroupB());
-  m_bus.sendCommandWholeChain(cmd, configB);
+  cmd = LTC681xBus::buildChainBusCommand(WriteConfigurationGroupB());
+  m_bus.sendCommand(cmd, configB);
 /*#ifdef DEBUGN
     serial->printf("Sent config B\n");
     for (unsigned int i = 0; i < 6; i++) {
@@ -101,7 +101,7 @@ void LTC6813Bus::readConfig() {
   // [6 voltage groups][each chip in chain][Register of 6 Bytes + PEC]
   uint8_t rxbuf[NUM_CHIPS][8];
 
-  m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadConfigurationGroupA()), 
+  m_bus.SendReadCommand(LTC681xBus::buildChainBusCommand(ReadConfigurationGroupA()), 
     rxbuf);
 
   std::cout << "Reading cfg A: \n";
@@ -117,7 +117,7 @@ void LTC6813Bus::readConfig() {
 void LTC6813Bus::getVoltages(uint16_t voltages[NUM_CHIPS][18]) {
   //Timer t;
   //t.start();
-  m_bus.sendCommandPollADC(LTC681xBus::buildBroadcastCommand
+  m_bus.SendCommandandPoll(LTC681xBus::buildBroadcastCommand
     (StartCellVoltageADC(AdcMode::k7k, false, CellSelection::kAll)));
   //t.stop();
 

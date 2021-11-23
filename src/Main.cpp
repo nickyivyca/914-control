@@ -10,17 +10,17 @@
 #include "mbed.h"
 #include "rtos.h"
 
-#include "MODSERIAL.h"
+//#include "MODSERIAL.h"
 
-#include "LTC681xBus.h"
+#include "LTC681xChainBus.h"
 #include "LTC6813.h"
 #include "BmsThread.h"
 #include "DataThread.h"
 #include "Data.h"
 
 
-MODSERIAL* serial;
-MODSERIAL* displayserial;
+BufferedSerial* serial;
+BufferedSerial* displayserial;
 CAN* canBus;
 
 DigitalOut* led1;
@@ -58,53 +58,15 @@ int main() {
                            PIN_6820_SPI_SSEL,
                            use_gpio_ssel);
   spiDriver->format(8, 0);
-  LTC681xBus ltcBus = LTC681xBus(spiDriver);
+  auto ltcBus = LTC681xChainBus<NUM_CHIPS>(spiDriver);
   LTC6813Bus ltc6813Bus = LTC6813Bus(ltcBus);
 
+  Thread bmsThreadThread;
   BMSThread bmsThread(&inbox_main, &inbox_bms, &ltcBus, &ltc6813Bus, &data_bms);
-  DataThread dataThread(&inbox_main, &inbox_data, &data_data);
+  bmsThreadThread.start(callback(&BMSThread::startThread, &bmsThread));
+  //DataThread dataThread(&inbox_main, &inbox_data, &data_data);
 
   osThreadSetPriority(osThreadGetId(), osPriorityHigh7);
-  // Flash LEDs to indicate startup
-  /*for (int i = 0; i < 7; i++) {
-    led = 1;
-    ThisThread::sleep_for(500);
-    led = 0;
-    ThisThread::sleep_for(500);
-  }*/
-
-  /*CANMessage msg;
-  while (1) {
-    if (canBus->read(msg)) {
-      serial->printf("Received with ID %#010x length %d\n", msg.id, msg.len);
-      if (msg.len == 8) {
-        switch (msg.id) {
-          case 0x10088A9E:
-            {
-              unsigned int voltage = msg.data[0] & msg.data[1]<<8;
-              unsigned int current = msg.data[2] & msg.data[3]<<8;
-              char temperature = msg.data[4];
-              unsigned char state = msg.data[5];
-              unsigned char errors = msg.data[6];
-              serial->printf("Voltage: %d\nCurrent: %d\nTemperature: %d\nState: %#01x\nErrors: %#01x\n", voltage, current, temperature, state, errors);
-              break;
-            }
-          case 0x10098A9E:
-            {
-              unsigned int speed = msg.data[0] & msg.data[1]<<8;
-              unsigned int mileage = msg.data[2] & msg.data[3]<<8;
-              int torque = (msg.data[4] & msg.data[5]<<8);
-              serial->printf("RPM: %d\nMileage: %d\nTorque: %d\n", speed, mileage, torque);
-              break;
-            }
-          default:
-            break;
-        }
-      }
-    }
-    // Sleep 100 secs
-    //ThisThread::sleep_for(100 * 1000);
-  }*/
   mail_t *msg_init = inbox_data.alloc();
   msg_init->msg_event = DATA_INIT;
   inbox_data.put(msg_init);
@@ -127,7 +89,7 @@ int main() {
             {
               //uint32_t copystart = t.read_ms();
               //std::cout << "New BMS data received\n";
-              data_main.mutex.lock();
+              /*data_main.mutex.lock();
               data_bms.mutex.lock();
               memcpy(&data_main.batterysummary, &data_bms.batterysummary, sizeof(data_main.batterysummary));
               memcpy(&data_main.batterydata, &data_bms.batterydata, sizeof(data_main.batterydata));
@@ -146,14 +108,14 @@ int main() {
               inbox_data.put(msg_out);
               msg_out = inbox_data.alloc();
               msg_out->msg_event = DATA_SUMMARY;
-              inbox_data.put(msg_out);
+              inbox_data.put(msg_out);*/
             }
             break;
           case BATT_ERR:
             {
-              mail_t *msg_out = inbox_data.alloc();
+              /*mail_t *msg_out = inbox_data.alloc();
               msg_out->msg_event = DATA_ERR;
-              inbox_data.put(msg_out);              
+              inbox_data.put(msg_out);     */         
             }
             break;
           default:
@@ -179,12 +141,11 @@ int main() {
 }
 
 void initIO() {
-  serial = new MODSERIAL(USBTX, USBRX, 1024, 32);
-  serial->baud(230400);
+  //serial = new MODSERIAL(USBTX, USBRX, 1024, 32);
+  serial = new BufferedSerial(USBTX, USBRX, 230400);
 
   //serial2 = new Serial(PIN_SERIAL2_TX, PIN_SERIAL2_RX, 230400);
-  displayserial = new MODSERIAL(PIN_DISPLAY_TX, PIN_DISPLAY_RX);
-  displayserial->baud(19200);
+  displayserial = new BufferedSerial(PIN_DISPLAY_TX, PIN_DISPLAY_RX, 19200);
 
   //serial->printf("INIT\n");
   

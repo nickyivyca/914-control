@@ -99,3 +99,7 @@ DELIVERY/
 
 
 mbed-os
+
+.mbedbuild
+cmake_build/
+lib-mbed-ltc681x
