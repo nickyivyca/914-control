@@ -95,8 +95,8 @@ class LTC6813 {
 class LTC6813Bus {
   public:
     LTC6813 m_chips[NUM_CHIPS];
-    LTC681xBus &m_bus;
-    LTC6813Bus(LTC681xChainBus<N_chips> &bus);
+    LTC681xBus::LTC681xChainBus<N_chips> &m_bus;
+    LTC6813Bus(LTC681xBus::LTC681xChainBus<N_chips> &bus);
     void updateConfig();
     void readConfig();
 

@@ -4,7 +4,8 @@
             "platform.stdio-baud-rate": 115200,
             "platform.default-serial-baud-rate": 115200,
             "rtos.main-thread-stack-size": 2048,
-            "rtos.thread-stack-size": 2048
+            "rtos.thread-stack-size": 2048,
+            "target.printf_lib": "std"
         }
     }
 }

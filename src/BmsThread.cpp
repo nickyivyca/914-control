@@ -108,8 +108,8 @@ void BMSThread::threadWorker() {
     m_batterydata->numBalancing = 0;
 
 
-    m_frequency = *DI_ChargeSwitch? CELL_SENSE_FREQUENCY_CHARGE : CELL_SENSE_FREQUENCY;
-    m_delay =  1000/m_frequency;
+    int m_frequency = *DI_ChargeSwitch? CELL_SENSE_FREQUENCY_CHARGE : CELL_SENSE_FREQUENCY;
+    int m_delay =  1000/m_frequency;
     //systime_t timeStart = chVTGetSystemTime();
     // Should be changed to ticker
 
@@ -149,7 +149,7 @@ void BMSThread::threadWorker() {
       balance_index = 0;
     }
 #endif
-    m_bus->wakeupChainSpi();
+    m_bus->WakeupBus();
     m_6813bus->muteDischarge();
     m_6813bus->updateConfig();
     uint8_t pecStatus = m_6813bus->getCombined(voltages, gpio_adc);

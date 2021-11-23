@@ -3,7 +3,7 @@
 #include "mbed.h"
 #include "rtos.h"
 
-#include "LTC681xChainBus.h"
+#include "LTC681xBus.h"
 
 #include "config.h"
 #include <bitset>
