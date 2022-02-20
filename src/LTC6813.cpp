@@ -82,11 +82,11 @@ void LTC6813Bus::updateConfig() {
     }
 #endif*/
 
-  LTC681xBus::Command cmd = LTC681xBus::buildChainBusCommand(WriteConfigurationGroupA());
-  m_bus.sendCommand(cmd, configA);
+  LTC681xBus::BusCommand cmd = LTC681xBus::BuildChainBusCommand(WriteConfigurationGroupA());
+  m_bus.SendDataCommand(cmd, configA);
 
-  cmd = LTC681xBus::buildChainBusCommand(WriteConfigurationGroupB());
-  m_bus.sendCommand(cmd, configB);
+  cmd = LTC681xBus::BuildChainBusCommand(WriteConfigurationGroupB());
+  m_bus.SendDataCommand(cmd, configB);
 /*#ifdef DEBUGN
     serial->printf("Sent config B\n");
     for (unsigned int i = 0; i < 6; i++) {
@@ -101,7 +101,7 @@ void LTC6813Bus::readConfig() {
   // [6 voltage groups][each chip in chain][Register of 6 Bytes + PEC]
   uint8_t rxbuf[NUM_CHIPS][8];
 
-  m_bus.SendReadCommand(LTC681xBus::buildChainBusCommand(ReadConfigurationGroupA()), 
+  m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadConfigurationGroupA()), 
     rxbuf);
 
   std::cout << "Reading cfg A: \n";
@@ -117,7 +117,7 @@ void LTC6813Bus::readConfig() {
 void LTC6813Bus::getVoltages(uint16_t voltages[NUM_CHIPS][18]) {
   //Timer t;
   //t.start();
-  m_bus.SendCommandandPoll(LTC681xBus::buildBroadcastCommand
+  m_bus.SendCommandAndPoll(LTC681xBus::BuildChainBusCommand
     (StartCellVoltageADC(AdcMode::k7k, false, CellSelection::kAll)));
   //t.stop();
 
@@ -128,17 +128,17 @@ void LTC6813Bus::getVoltages(uint16_t voltages[NUM_CHIPS][18]) {
   uint8_t rxbuf[6][NUM_CHIPS][8];
 
   //m_bus.wakeupChainSpi();
-  m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupA()), 
+  m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadCellVoltageGroupA()), 
     rxbuf[0]);
-  m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupB()), 
+  m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadCellVoltageGroupB()), 
     rxbuf[1]);
-  m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupC()), 
+  m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadCellVoltageGroupC()), 
     rxbuf[2]);
-  m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupD()), 
+  m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadCellVoltageGroupD()), 
     rxbuf[3]);
-  m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupE()), 
+  m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadCellVoltageGroupE()), 
     rxbuf[4]);
-  m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupF()), 
+  m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadCellVoltageGroupF()), 
     rxbuf[5]);
   //ThisThread::sleep_for(1);
 
@@ -160,7 +160,7 @@ void LTC6813Bus::getVoltages(uint16_t voltages[NUM_CHIPS][18]) {
 void LTC6813Bus::getGpio(uint16_t voltages[NUM_CHIPS][9]) {
   //Timer t;
   //t.start();
-  m_bus.sendCommandPollADC(LTC681xBus::buildBroadcastCommand
+  m_bus.SendCommandAndPoll(LTC681xBus::BuildChainBusCommand
     (StartGpioADC(AdcMode::k7k, GpioSelection::kAll)));
   //t.stop();
   //std::cout << t.read_us() << "us" << '\n';
@@ -169,13 +169,13 @@ void LTC6813Bus::getGpio(uint16_t voltages[NUM_CHIPS][9]) {
   // [4 aux voltage groups][each chip in chain][Register of 6 Bytes + PEC]
   uint8_t rxbuf[4][NUM_CHIPS][8];
 
-  m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadAuxiliaryGroupA()), 
+  m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadAuxiliaryGroupA()), 
     rxbuf[0]);
-  m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadAuxiliaryGroupB()), 
+  m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadAuxiliaryGroupB()), 
     rxbuf[1]);
-  m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadAuxiliaryGroupC()), 
+  m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadAuxiliaryGroupC()), 
     rxbuf[2]);
-  m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadAuxiliaryGroupD()), 
+  m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadAuxiliaryGroupD()), 
     rxbuf[3]);
 
   uint8_t measCursor = 0;
@@ -195,7 +195,8 @@ void LTC6813Bus::getGpio(uint16_t voltages[NUM_CHIPS][9]) {
 uint8_t LTC6813Bus::getCombined(uint16_t cellVoltages[NUM_CHIPS][18], uint16_t adcVoltages[NUM_CHIPS][2]) {
   //Timer t;
   //t.start();
-  m_bus.sendCommandPollADC(LTC681xBus::buildBroadcastCommand(StartCombinedADC(AdcMode::k7k)));
+  m_bus.SendCommandAndPoll(LTC681xBus::BuildChainBusCommand
+    (StartCombinedCellVoltageGpioConversion(AdcMode::k7k, false)));
   //t.stop();
 
   //std::cout << t.read_ms() << '\n';
@@ -206,19 +207,19 @@ uint8_t LTC6813Bus::getCombined(uint16_t cellVoltages[NUM_CHIPS][18], uint16_t a
 
   //m_bus.wakeupChainSpi();
   uint8_t pecStatuses = 0;
-  pecStatuses |= m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupA()), 
+  pecStatuses |= m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadCellVoltageGroupA()), 
     rxbuf[0]);
-  pecStatuses |= m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupB()), 
+  pecStatuses |= m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadCellVoltageGroupB()), 
     rxbuf[1])<<1;
-  pecStatuses |= m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupC()), 
+  pecStatuses |= m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadCellVoltageGroupC()), 
     rxbuf[2])<<2;
-  pecStatuses |= m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupD()), 
+  pecStatuses |= m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadCellVoltageGroupD()), 
     rxbuf[3])<<3;
-  pecStatuses |= m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupE()), 
+  pecStatuses |= m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadCellVoltageGroupE()), 
     rxbuf[4])<<4;
-  pecStatuses |= m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupF()), 
+  pecStatuses |= m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadCellVoltageGroupF()), 
     rxbuf[5])<<5;
-  pecStatuses |= m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadAuxiliaryGroupA()), 
+  pecStatuses |= m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadAuxiliaryGroupA()), 
     rxbuf[6])<<6;
   //ThisThread::sleep_for(1);
 
@@ -249,15 +250,15 @@ uint8_t LTC6813Bus::getCombined(uint16_t cellVoltages[NUM_CHIPS][18], uint16_t a
 void LTC6813Bus::getStatus(LTC6813::Status statuses[NUM_CHIPS]) {
   //Timer t;
   //t.start();
-  m_bus.sendCommandPollADC(LTC681xBus::buildBroadcastCommand
-    (StartStatusADC(AdcMode::k7k, StatusGroupSelection::kAll)));
+  m_bus.SendCommandAndPoll(LTC681xBus::BuildChainBusCommand
+    (StartStatusGroupConversion(AdcMode::k7k, StatusGroupSelection::kAll)));
 
   // [2 status registers][each chip in chain][Register of 6 Bytes + PEC]
   uint8_t rxbuf[2][NUM_CHIPS][8];
 
-  m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadStatusGroupA()), 
+  m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadStatusGroupA()), 
     rxbuf[0]);
-  m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadStatusGroupB()), 
+  m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadStatusGroupB()), 
     rxbuf[1]);
 
   for (unsigned int k = 0; k < NUM_CHIPS; k++) { // iterate over each chip's worth of data
@@ -277,13 +278,13 @@ void LTC6813Bus::getStatus(LTC6813::Status statuses[NUM_CHIPS]) {
 void LTC6813Bus::getDieTemps(uint8_t dieTemps[NUM_CHIPS]) {
   //Timer t;
   //t.start();
-  m_bus.sendCommandPollADC(LTC681xBus::buildBroadcastCommand
-    (StartStatusADC(AdcMode::k7k, StatusGroupSelection::k2)));
+  m_bus.SendCommandAndPoll(LTC681xBus::BuildChainBusCommand
+    (StartStatusGroupConversion(AdcMode::k7k, StatusGroupSelection::kITMP)));
 
   // [2 status registers][each chip in chain][Register of 6 Bytes + PEC]
   uint8_t rxbuf[NUM_CHIPS][8];
 
-  m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadStatusGroupA()), 
+  m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadStatusGroupA()), 
     rxbuf);
 
   for (unsigned int k = 0; k < NUM_CHIPS; k++) { // iterate over each chip's worth of data
@@ -293,14 +294,14 @@ void LTC6813Bus::getDieTemps(uint8_t dieTemps[NUM_CHIPS]) {
 }
 
 void LTC6813Bus::muteDischarge() {
-  m_bus.sendCommand(LTC681xBus::buildBroadcastCommand(MuteDischarge()));
+  m_bus.sendCommand(LTC681xBus::BuildChainBusCommand(MuteDischarge()));
 }
 void LTC6813Bus::unmuteDischarge() {
-  m_bus.sendCommand(LTC681xBus::buildBroadcastCommand(UnmuteDischarge()));
+  m_bus.sendCommand(LTC681xBus::BuildChainBusCommand(UnmuteDischarge()));
 }
 /*uint16_t *LTC6813::getGpioPin(GpioSelection pin) {
   auto cmd = StartGpioADC(AdcMode::k7k, pin);
-  m_bus.sendCommand(LTC681xBus::buildBroadcastCommand(cmd));
+  m_bus.sendCommand(LTC681xBus::BuildChainBusCommand(cmd));
 
   // Wait 5 ms for ADC to finish
   ThisThread::sleep_for(pin == GpioSelection::kAll ? 15 : 5); // TODO: Change to polling

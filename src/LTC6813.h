@@ -1,6 +1,6 @@
 #pragma once
 
-#include "LTC681xBus.h"
+#include "LTC681xChainBus.h"
 
 #include "config.h"
 
@@ -95,8 +95,8 @@ class LTC6813 {
 class LTC6813Bus {
   public:
     LTC6813 m_chips[NUM_CHIPS];
-    LTC681xBus::LTC681xChainBus<N_chips> &m_bus;
-    LTC6813Bus(LTC681xBus::LTC681xChainBus<N_chips> &bus);
+    LTC681xBus::LTC681xChainBus<NUM_CHIPS> &m_bus;
+    LTC6813Bus(LTC681xBus::LTC681xChainBus<NUM_CHIPS> &bus);
     void updateConfig();
     void readConfig();
 
