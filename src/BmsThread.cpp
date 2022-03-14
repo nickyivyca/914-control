@@ -203,13 +203,13 @@ void BMSThread::threadWorker() {
           int index = BMS_CELL_MAP[j];
           if (index != -1) {
             // add 5mV for top of cellbox and bottom of cellbox
-            if ((i%2 && index == 13) || (!i%2 && index == 0)) {
+            /*if ((i%2 && index == 13) || (!i%2 && index == 0)) {
               voltage += 5;
             }
             // add 7 mV for top of cellbox for current sense
             if (i == ISENSE_LOCATION && index == 13) {
               voltage += 7;
-            }
+            }*/
             // adjust for 15mV offset due to current sensor
             if (i == ISENSE_LOCATION-1 && index == 13) {
               voltage -= 15;
@@ -283,7 +283,7 @@ void BMSThread::threadWorker() {
           for (uint8_t j = 0; j < 2; j++) {
             // calculate resistance from voltage
             float thermvolt = gpio_adc[i][j]/10000.0;
-            float resistance = (4700.0 * thermvolt)/(5.0 - thermvolt);
+            float resistance = (10000.0 * thermvolt)/(5.0 - thermvolt);
             //std::cout << "Calculated resistance " << j+1 << ":  " << resistance << "\n";
 
             // https://github.com/panStamp/thermistor/blob/master/thermistor.cpp
@@ -319,7 +319,7 @@ void BMSThread::threadWorker() {
       }
     
 
-      /*float totalVoltage_scaled = ((float)totalVoltage)/1000.0;
+      float totalVoltage_scaled = ((float)totalVoltage)/1000.0;
       float totalCurrent_scaled = ((float)totalCurrent)/1000.0;
 
       std::cout << "Pack Voltage: " << ceil(totalVoltage_scaled * 10.0) / 10.0 << "V"  // round to 1 decimal place
@@ -331,7 +331,7 @@ void BMSThread::threadWorker() {
       << "\nMax Temp: " << maxTemp << " " << (char)('A'+(maxTemp_box/2)) << (maxTemp_box%2)+1
       << " Min Temp: " << minTemp << " " << (char)('A'+(minTemp_box/2)) << (minTemp_box%2)+1;
       std::cout << '\n';
-      std::cout << '\n';*/
+      std::cout << '\n';
 
       m_batterysummary->minVoltage = minVoltage;
       m_batterysummary->minVoltage_cell = minVoltage_cell;
@@ -384,7 +384,7 @@ void BMSThread::threadWorker() {
       mail_t *msg = m_outbox->alloc();
       msg->msg_event = BATT_ERR;
       m_outbox->put(msg);
-      //std::cout << "PEC error! " << pecprint << '\n';
+      std::cout << "PEC error! " << pecprint << '\n';
       *led3 = 1;
     }
 
