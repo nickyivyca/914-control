@@ -206,6 +206,10 @@ uint8_t LTC6813Bus::getCombined(uint16_t cellVoltages[NUM_CHIPS][18], uint16_t a
 
   //m_bus.wakeupChainSpi();
   uint8_t pecStatuses = 0;
+  /*m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupF()), 
+    rxbuf[5]);*/
+  m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupA()), 
+    rxbuf[0]);
   pecStatuses |= m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupA()), 
     rxbuf[0]);
   pecStatuses |= m_bus.readWholeChainCommand(LTC681xBus::buildBroadcastCommand(ReadCellVoltageGroupB()), 

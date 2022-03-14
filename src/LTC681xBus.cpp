@@ -2,6 +2,7 @@
 
 // TODO: stdout should not be in this header
 #include "config.h"
+#include "pinout.h"
 
 #include "mbed.h"
 
@@ -325,6 +326,7 @@ uint8_t LTC681xBus::readWholeChainCommand(Command txCmd, uint8_t rxbuf[NUM_CHIPS
       // TODO: return error or throw out read result
       /*serial->printf("ERR: Bad PEC on read on chip %d. Computed: 0x%x. Actual: 0x%x\r\n",
         i, dataPec, (uint16_t)(rxbuf[i][6] << 8 | rxbuf[i][7]));*/
+      //serial->printf("ERR: Bad PEC on read on chip %d.\r\n", i);
       return 1;
     }
   }

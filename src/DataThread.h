@@ -121,7 +121,7 @@ class DataThread {
                   float totalCurrent_scaled = ((float)m_data->totalCurrent)/1000.0;
                   //std::cout << "Data thread received full data\n";
                   // Print line of CSV data
-                  printbuff << std::fixed << std::setprecision(1) << m_data->timestamp << ',' << m_data->packVoltage/1000.0 
+                  /*printbuff << std::fixed << std::setprecision(1) << m_data->timestamp << ',' << m_data->packVoltage/1000.0 
                   << ',' << totalCurrent_scaled << ',' << totalCurrent_scaled * m_data->packVoltage / 1000000.0 << ',' << m_data->joules/3600;
                   for (uint16_t i = 0; i < NUM_CHIPS * NUM_CELLS_PER_CHIP; i++) {
                     printbuff << ',' << m_data->allVoltages[i];
@@ -136,7 +136,7 @@ class DataThread {
                   printbuff << ',' << (int)errCount;
                   printbuff << '\n';
                   //uint32_t curtime = t.read_us();
-                  serial->printf(printbuff.str().c_str());
+                  serial->printf(printbuff.str().c_str());*/
                   //std::cout << printbuff.str();
                   //std::cout << "Print time: " << (t.read_us() - curtime) << "us \n";
                   //serial2->printf(printbuff.str().c_str());
@@ -145,7 +145,7 @@ class DataThread {
               case DATA_SUMMARY:
                 //std::cout << "Data thread received summary\n";
                 {
-                  /*float totalVoltage_scaled = ((float)m_summary->totalVoltage)/1000.0;
+                  float totalVoltage_scaled = ((float)m_summary->totalVoltage)/1000.0;
                   float totalCurrent_scaled = ((float)m_summary->totalCurrent)/1000.0;
 
 
@@ -159,9 +159,10 @@ class DataThread {
                   << "\nMax Temp: " << m_summary->maxTemp << " " << (char)('A'+(m_summary->maxTemp_box/2)) << (m_summary->maxTemp_box%2)+1
                   << " Min Temp: " << m_summary->minTemp << " " << (char)('A'+(m_summary->minTemp_box/2)) << (m_summary->minTemp_box%2)+1;
                   printbuff << "\n\n";
-                  std::cout << printbuff.str();
-                  printbuff.str("");*/
+                  serial->printf(printbuff.str().c_str());
+                  printbuff.str("");
                   //uint32_t curtime = t.read_us();
+
 
                   int64_t wh = m_summary->joules/3600;
 
@@ -175,7 +176,7 @@ class DataThread {
                   << " -: " << setw(2) << (int)round(m_summary->minTemp) << " " << (char)('A'+(m_summary->minTemp_box/2)) << (m_summary->minTemp_box%2)+1;
 
 
-                  //serial2->printf(printbuff.str().c_str());
+                  
 
 
                   displayserial->putc(0x80); // move to 0,0

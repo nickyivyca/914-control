@@ -170,6 +170,7 @@ class BMSThread {
       }
 #endif
       m_bus->wakeupChainSpi();
+      m_bus->wakeupChainSpi(); // wake up twice due to boards going in both directions
       m_6813bus->muteDischarge();
       m_6813bus->updateConfig();
       uint8_t pecStatus = m_6813bus->getCombined(voltages, gpio_adc);
@@ -201,6 +202,7 @@ class BMSThread {
 
 
       if (!pecStatus) {
+      //if (true) {
         m_mutex->lock();
         for (unsigned int i = 0; i < NUM_CHIPS; i++) {
 
@@ -223,13 +225,13 @@ class BMSThread {
             int index = BMS_CELL_MAP[j];
             if (index != -1) {
               // add 5mV for top of cellbox and bottom of cellbox
-              if ((i%2 && index == 13) || (!i%2 && index == 0)) {
+              /*if ((i%2 && index == 13) || (!i%2 && index == 0)) {
                 voltage += 5;
               }
               // add 7 mV for top of cellbox for current sense
               if (i == ISENSE_LOCATION && index == 13) {
                 voltage += 7;
-              }
+              }*/
               // adjust for 15mV offset due to current sensor
               if (i == ISENSE_LOCATION-1 && index == 13) {
                 voltage -= 15;
@@ -289,12 +291,13 @@ class BMSThread {
           //serial->printf("\n");
           // Calculate current sensor
           if (i == ISENSE_LOCATION) {
-            if (!currentZeroed) {
+            /*if (!currentZeroed) {
               currentZero = gpio_adc[i][0]/10000.0;
               currentZeroed = true;
-            }
+            }*/
             // replace 2.497 with zero'd value from startup? maybe use ref
-            int current = (ISENSE_RANGE * (gpio_adc[i][0]/10000.0 - currentZero) / 0.625) * 1000.0; // unit mA
+            //int current = (ISENSE_RANGE * (gpio_adc[i][0]/10000.0 - currentZero) / 0.625) * 1000.0; // unit mA
+            int current = (ISENSE_RANGE * (gpio_adc[i][0] - gpio_adc[i][1])/10 / 0.625); // unit mA
             totalCurrent += current;
             //std::cout << "Current: " << current << '\n';
           }
@@ -303,7 +306,7 @@ class BMSThread {
             for (uint8_t j = 0; j < 2; j++) {
               // calculate resistance from voltage
               float thermvolt = gpio_adc[i][j]/10000.0;
-              float resistance = (4700.0 * thermvolt)/(5.0 - thermvolt);
+              float resistance = (10000.0 * thermvolt)/(5.0 - thermvolt);
               //std::cout << "Calculated resistance " << j+1 << ":  " << resistance << "\n";
 
               // https://github.com/panStamp/thermistor/blob/master/thermistor.cpp
@@ -404,7 +407,7 @@ class BMSThread {
         mail_t *msg = m_outbox->alloc();
         msg->msg_event = BATT_ERR;
         m_outbox->put(msg);
-        //std::cout << "PEC error! " << pecprint << '\n';
+        std::cout << "PEC error! " << pecprint << '\n';
         *led3 = 1;
       }
 
