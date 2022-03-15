@@ -51,9 +51,12 @@ uint16_t gpio_adc[NUM_CHIPS][2];
 
 float currentZero;
 bool currentZeroed = false;
+bool SoCinitialized = false;
+uint8_t SoC;
 bool startedUp = false;
 bool voltagecheckOK = true;
 bool faultThrown = false;
+int millicoulombs;
 
 enum state {INIT, RUN, FAULT};
 
@@ -278,6 +281,7 @@ void BMSThread::threadWorker() {
           totalCurrent += current;
           //std::cout << "Current: " << current << '\n';
         }
+
         // Calculate thermistors: present on even chips (lower chip of each box)
         if (!(i % 2)) {
           for (uint8_t j = 0; j < 2; j++) {
@@ -317,12 +321,38 @@ void BMSThread::threadWorker() {
           }
         }
       }
+
+      if (!SoCinitialized) {
+        //printf("Min voltage is  %u\n", minVoltage);
+        for (uint8_t j = 0; j < 101; j++) {
+          if (minVoltage >= SoC_lookup[j] && minVoltage < SoC_lookup[j+1]) {
+            SoC = j;
+            SoCinitialized = true;
+            millicoulombs = mc_lookup[SoC];
+            //printf("SoC initialized to %u with %d coulombs to 0\n", SoC, millicoulombs/1000);
+            break;
+          }
+        }
+      } else {
+        millicoulombs += totalCurrent/m_frequency;
+        if (millicoulombs < 0) {
+          SoC = 0;
+        } else {
+          for (uint8_t j = 0; j < 101; j++) {
+            if (millicoulombs >= mc_lookup[j] && millicoulombs < mc_lookup[j+1]) {
+              SoC = j;
+              break;
+            }
+          }
+        }
+        //printf("Current of %dmA MC at %u SoC at %u\n", totalCurrent, millicoulombs, SoC);
+      }
     
 
       float totalVoltage_scaled = ((float)totalVoltage)/1000.0;
       float totalCurrent_scaled = ((float)totalCurrent)/1000.0;
 
-      std::cout << "Pack Voltage: " << ceil(totalVoltage_scaled * 10.0) / 10.0 << "V"  // round to 1 decimal place
+      /*std::cout << "Pack Voltage: " << ceil(totalVoltage_scaled * 10.0) / 10.0 << "V"  // round to 1 decimal place
       << " Current: " << totalCurrent_scaled << "A"
       << "\nPower: " << ceil(totalCurrent_scaled * (totalVoltage_scaled * 10.0) / 1000.0) / 10.0 << "kW"  // round to 1 decimal place, scale to kW
       << "\nMax Cell: " << maxVoltage << " " << (char)('A'+(maxVoltage_cell/28)) << (maxVoltage_cell%28)+1
@@ -331,7 +361,7 @@ void BMSThread::threadWorker() {
       << "\nMax Temp: " << maxTemp << " " << (char)('A'+(maxTemp_box/2)) << (maxTemp_box%2)+1
       << " Min Temp: " << minTemp << " " << (char)('A'+(minTemp_box/2)) << (minTemp_box%2)+1;
       std::cout << '\n';
-      std::cout << '\n';
+      std::cout << '\n';*/
 
       m_batterysummary->minVoltage = minVoltage;
       m_batterysummary->minVoltage_cell = minVoltage_cell;
@@ -346,6 +376,9 @@ void BMSThread::threadWorker() {
 
       m_batterysummary->joules += ((totalCurrent/1000) * ((int32_t)(totalVoltage/1000))/m_frequency);
       m_batterydata->joules = m_batterysummary->joules;
+
+      m_batterydata->soc = SoC;
+      m_batterysummary->soc = SoC;
 
       m_batterydata->totalCurrent = totalCurrent;
       m_batterydata->packVoltage = totalVoltage;

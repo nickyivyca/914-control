@@ -16,6 +16,7 @@ typedef struct {
   uint32_t timestamp;
   unsigned int packVoltage;
   int64_t joules;
+  uint8_t soc;
 } batterydata_t;
 
 typedef struct {
@@ -31,6 +32,7 @@ typedef struct {
   unsigned int totalVoltage;
   int64_t joules;
   uint32_t timestamp;
+  uint8_t soc;
 
 } batterysummary_t;
 
