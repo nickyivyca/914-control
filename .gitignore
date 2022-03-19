@@ -97,5 +97,9 @@ test_suite.json
 # default delivery dir
 DELIVERY/
 
-
+# mbed stuff
 mbed-os
+
+# mbed-6 stuff that stays when switching branches sometimes
+cmake_build/
+lib-mbed-ltc681x/
