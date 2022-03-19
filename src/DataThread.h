@@ -86,13 +86,13 @@ class DataThread {
                   //serial2->printf(printbuff.str().c_str());
 
                   // Init display
-                  /*displayserial->putc(0x0C);
+                  displayserial->putc(0x0C);
                   ThisThread::sleep_for(5);
                   displayserial->putc(0x11); // Backlight on
                   displayserial->putc(0x16); // Cursor off, no blink
 
                   // add custom characters
-                  uint8_t customchar = 0b00010000;
+                  /*uint8_t customchar = 0b00010000;
                   uint8_t charindex = 0xf8;
                   displayserial->putc(0x94);// move to second row to test characters
                   displayserial->putc(charindex);

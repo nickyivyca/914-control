@@ -7,17 +7,17 @@
 
 // Number of 6813 chips on isospi bus
 #ifndef NUM_CHIPS
-#define NUM_CHIPS 2
+#define NUM_CHIPS 6
 #endif
 
 // Nominal range of the LEM sensor
 #ifndef ISENSE_RANGE
-#define ISENSE_RANGE 300.0
+#define ISENSE_RANGE 200.0
 #endif
 
 // Chip number for where the LEM is plugged in, 0 indexed
 #ifndef ISENSE_LOCATION
-#define ISENSE_LOCATION 1
+#define ISENSE_LOCATION 5
 #endif
 
 #ifndef CELL_SENSE_FREQUENCY

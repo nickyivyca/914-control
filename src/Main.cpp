@@ -15,8 +15,8 @@
 #include "LTC681xChainBus.h"
 #include "LTC6813.h"
 #include "BmsThread.h"
-//#include "DataThread.h"
-//#include "Data.h"
+#include "DataThread.h"
+#include "Data.h"
 
 
 BufferedSerial* serial;
@@ -64,7 +64,7 @@ int main() {
   Thread bmsThreadThread;
   BMSThread bmsThread(&inbox_main, &inbox_bms, &ltcBus, &ltc6813Bus, &data_bms);
   bmsThreadThread.start(callback(&BMSThread::startThread, &bmsThread));
-  //DataThread dataThread(&inbox_main, &inbox_data, &data_data);
+  DataThread dataThread(&inbox_main, &inbox_data, &data_data);
 
   osThreadSetPriority(osThreadGetId(), osPriorityHigh7);
   mail_t *msg_init = inbox_data.alloc();
@@ -89,7 +89,7 @@ int main() {
             {
               //uint32_t copystart = t.read_ms();
               //std::cout << "New BMS data received\n";
-              /*data_main.mutex.lock();
+              data_main.mutex.lock();
               data_bms.mutex.lock();
               memcpy(&data_main.batterysummary, &data_bms.batterysummary, sizeof(data_main.batterysummary));
               memcpy(&data_main.batterydata, &data_bms.batterydata, sizeof(data_main.batterydata));
@@ -108,7 +108,7 @@ int main() {
               inbox_data.put(msg_out);
               msg_out = inbox_data.alloc();
               msg_out->msg_event = DATA_SUMMARY;
-              inbox_data.put(msg_out);*/
+              inbox_data.put(msg_out);
             }
             break;
           case BATT_ERR:
