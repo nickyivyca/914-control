@@ -183,7 +183,8 @@ void BMSThread::threadWorker() {
     // Now time to crunch numbers
 
 
-    if (!pecStatus) {
+    //if (!pecStatus) {
+    if (true) {
       m_mutex->lock();
       for (unsigned int i = 0; i < NUM_CHIPS; i++) {
 

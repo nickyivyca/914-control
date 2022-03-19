@@ -86,31 +86,44 @@ class DataThread {
                   //serial2->printf(printbuff.str().c_str());
 
                   // Init display
-                  displayserial->putc(0x0C);
+                  /*displayserial->putc(0x0C);
                   ThisThread::sleep_for(5);
                   displayserial->putc(0x11); // Backlight on
-                  displayserial->putc(0x16); // Cursor off, no blink
+                  displayserial->putc(0x16); // Cursor off, no blink*/
+
+                  uint8_t dispinit[3] = {0x0C, 0x11, 0x16};
+
+                  displayserial->write(dispinit, 1);
+                  ThisThread::sleep_for(5);
+                  displayserial->write(&dispinit[1], 2);
 
                   // add custom characters
-                  /*uint8_t customchar = 0b00010000;
+                  uint8_t customchar = 0b00010000;
                   uint8_t charindex = 0xf8;
-                  displayserial->putc(0x94);// move to second row to test characters
-                  displayserial->putc(charindex);
-                  for (uint8_t j = 0; j < 8; j++) {
+                  //displayserial->putc(0x94);// move to second row to test characters
+                  uint8_t charinit[9] = {0xf8, 0,0,0,0,0,0,0,0};
+                  displayserial->write(dispinit, 9);
+                  //displayserial->putc(charindex);
+                  /*for (uint8_t j = 0; j < 8; j++) {
                     displayserial->putc(0);
-                  }
-                  charindex++;
+                  }*/
+                  //charindex++;
+                  charinit[0]++;
                   for (uint8_t i = 0; i < 5; i++) {
-                    displayserial->putc(charindex);
+                    //displayserial->putc(charindex);
                     for (uint8_t j = 0; j < 8; j++) {
-                      displayserial->putc(customchar);
+                      //displayserial->putc(customchar);
+                      charinit[j+1] = customchar;
                     }
+                    displayserial->write(dispinit, 9);
+
                     customchar |= (customchar >> 1);
-                    charindex++;
+                    charinit[0]++;
+                    //charindex++;
 
                     //std::cout << "sending custom char " << (int)i << '\n';
                     //displayserial->putc((int)i);
-                  }*/
+                  }
 
                   /*for (uint8_t i = 0; i < 6; i++) {
                     displayserial->putc(i);
@@ -180,8 +193,11 @@ class DataThread {
 
                   //serial2->printf(printbuff.str().c_str());
 
+                  uint8_t dispprint[22] = {0x80, // Move to 0,0
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // Block for current bar
+                    0x94}; // Move to 1,0
 
-                  /*displayserial->putc(0x80); // move to 0,0
+                  //displayserial->putc(0x80); // move to 0,0
 
                   int64_t power = m_summary->totalCurrent*((int64_t)m_summary->totalVoltage)/1000000;
                   // Guards display overflow
@@ -194,21 +210,27 @@ class DataThread {
                     fullcount = 19;
                   }
                   for (uint8_t i = 0; i < fullcount; i++) {
-                    displayserial->putc(0x5);
+                    //displayserial->putc(0x5);
+                    dispprint[i+1] = 0x5;
                   }
                   // Scale remainder 0-5 for end of the bar
                   uint8_t finalchar = (uint8_t)(((power+DISP_PER_BOX)%DISP_PER_BOX)/(DISP_PER_BOX/5));
-                  displayserial->putc(finalchar);
+                  //displayserial->putc(finalchar);
+                  dispprint[fullcount+1] = finalchar;
                   if (errCount == 800) {
                     errCount = 0;
                   }
 
-                  for (uint8_t i = 0; i < (19 - fullcount); i++) {
+                  /*for (uint8_t i = 0; i < (19 - fullcount); i++) {
                     displayserial->putc(0);
-                  }
+                  }*/
+                  //uint32_t curtime = t.read_us();
+                  displayserial->write(dispprint, 22);
+                  displayserial->write(printbuff.str().c_str(), strlen(printbuff.str().c_str()));
+                  //std::cout << "Print time: " << (t.read_us() - curtime) << "us \n";
+                  //displayserial->printf(printbuff.str().c_str());
 
-                  displayserial->putc(0x94); // move to 1,0
-                  displayserial->printf(printbuff.str().c_str());*/
+
                   //std::cout << "Print time: " << (t.read_us() - curtime) << "us \n";
                   //std::cout << m_summary->totalCurrent << "A " << m_summary->totalVoltage/1000 << "V " << "Calc: " << m_summary->totalCurrent*(int32_t)m_summary->totalVoltage/1000000 << " " << power/1000 << "kW fullcount: " << (int)fullcount << " final: " << (int)finalchar << " time: " <<  t.read_ms()-startTime << '\n';
                 }

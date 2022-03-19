@@ -10,8 +10,6 @@
 #include "mbed.h"
 #include "rtos.h"
 
-//#include "MODSERIAL.h"
-
 #include "LTC681xChainBus.h"
 #include "LTC6813.h"
 #include "BmsThread.h"
@@ -49,8 +47,6 @@ int main() {
   initIO();
 
   uint8_t blink = 0;
-
-  //ThisThread::sleep_for(1000);
 
   SPI* spiDriver = new SPI(PIN_6820_SPI_MOSI,
                            PIN_6820_SPI_MISO,
