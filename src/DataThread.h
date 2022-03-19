@@ -60,7 +60,7 @@ class DataThread {
                   //std::cout << "Data thread received init\n";
 
                   // Print CSV header
-                  printbuff << "time_millis,packVoltage,totalCurrent,kW,Whr";
+                  printbuff << "time_millis,packVoltage,totalCurrent,kW,Whr,soc";
                   //serial->printf(printbuff.str().c_str());
                   std::cout << printbuff.str();
                   printbuff.str(std::string());
@@ -102,7 +102,7 @@ class DataThread {
                   uint8_t charindex = 0xf8;
                   //displayserial->putc(0x94);// move to second row to test characters
                   uint8_t charinit[9] = {0xf8, 0,0,0,0,0,0,0,0};
-                  displayserial->write(dispinit, 9);
+                  displayserial->write(charinit, 9);
                   //displayserial->putc(charindex);
                   /*for (uint8_t j = 0; j < 8; j++) {
                     displayserial->putc(0);
@@ -115,7 +115,7 @@ class DataThread {
                       //displayserial->putc(customchar);
                       charinit[j+1] = customchar;
                     }
-                    displayserial->write(dispinit, 9);
+                    displayserial->write(charinit, 9);
 
                     customchar |= (customchar >> 1);
                     charinit[0]++;
@@ -138,7 +138,7 @@ class DataThread {
                   //std::cout << "Data thread received full data\n";
                   // Print line of CSV data
                   printbuff << std::fixed << std::setprecision(1) << m_data->timestamp << ',' << m_data->packVoltage/1000.0 
-                  << ',' << totalCurrent_scaled << ',' << totalCurrent_scaled * m_data->packVoltage / 1000000.0 << ',' << m_data->joules/3600;
+                  << ',' << totalCurrent_scaled << ',' << totalCurrent_scaled * m_data->packVoltage / 1000000.0 << ',' << m_data->joules/3600 << ',' << (int)m_data->soc;
                   for (uint16_t i = 0; i < NUM_CHIPS * NUM_CELLS_PER_CHIP; i++) {
                     printbuff << ',' << m_data->allVoltages[i];
                   }
