@@ -342,7 +342,7 @@ void BMSThread::threadWorker() {
           }
         }
       } else {
-        millicoulombs += totalCurrent/m_frequency;
+        millicoulombs -= totalCurrent/m_frequency;
         if (millicoulombs < 0) {
           SoC = 0;
         } else {
