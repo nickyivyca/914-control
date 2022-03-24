@@ -32,9 +32,9 @@
 #define MAIN_PERIOD 10
 #endif
 
-#ifndef TESTBALANCE
-#define TESTBALANCE
-#endif
+// #ifndef TESTBALANCE
+// #define TESTBALANCE
+// #endif
 
 /*#ifndef DEBUGN
 #define DEBUGN

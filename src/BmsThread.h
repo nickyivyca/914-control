@@ -35,9 +35,6 @@ class BMSThread {
   Mutex* m_mutex;
   batterydata_t* m_batterydata;
   batterysummary_t* m_batterysummary;
-  
-  // Things that need to go away
-  bool m_discharging = false;
 
   void throwBmsFault();
   void threadWorker();
