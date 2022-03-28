@@ -159,8 +159,9 @@ void BMSThread::threadWorker() {
     m_batterydata->timestamp = t.read_ms();
     m_batterysummary->timestamp = t.read_ms();
     m_6813bus->unmuteDischarge();
-
-    m_6813bus->getDieTemps(m_batterydata->dieTemps);
+    if (*DI_ChargeSwitch) {
+      m_6813bus->getDieTemps(m_batterydata->dieTemps);
+    }
 
 
 
@@ -272,6 +273,11 @@ void BMSThread::threadWorker() {
             }
           }
         }
+        /*if (*DI_ChargeSwitch) {
+          LTC6813::Configuration& conf = m_6813bus->m_chips[i].getConfig();
+          std::bitset<16> balancemap(conf.dischargeState.value);
+          std::cout << "Chip " << (int)i << " balance: " << balancemap << '\n';
+        }*/
         //serial->printf("\n");
         // Calculate current sensor
         if (i == ISENSE_LOCATION) {

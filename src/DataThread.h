@@ -182,13 +182,13 @@ class DataThread {
                   int64_t wh = m_summary->joules/3600;
 
                   printbuff << setw(3) << m_summary->totalCurrent/1000 << "A " << setw(3) << m_summary->totalVoltage/1000 << "V" 
-                  << setw(3) << wh/1000 << "." << (wh%1000)/100 << "kWhr"
+                  << setw(3) << wh/1000 << "." << (wh%1000)/100 << "kWhr "
                   << "\r-:" << setw(3) << m_summary->minVoltage/10 << " +:" << setw(3) << m_summary->maxVoltage/10
                   << " A:" << setw(3) << m_summary->totalVoltage/(NUM_CELLS_PER_CHIP*NUM_CHIPS)/10
                   /*<< "\r " << (char)('A'+(m_summary->maxVoltage_cell/28)) << setw(2) << (m_summary->maxVoltage_cell%28)+1
                   << " " << (char)('A'+(m_summary->maxVoltage_cell/28)) << setw(2) << (m_summary->maxVoltage_cell%28)+1*/
                   << "\r+: " << setw(2) << (int)round(m_summary->maxTemp) << " " << (char)('A'+(m_summary->maxTemp_box/2)) << (m_summary->maxTemp_box%2)+1
-                  << " -: " << setw(2) << (int)round(m_summary->minTemp) << " " << (char)('A'+(m_summary->minTemp_box/2)) << (m_summary->minTemp_box%2)+1;
+                  << " -: " << setw(2) << (int)round(m_summary->minTemp) << " " << (char)('A'+(m_summary->minTemp_box/2)) << (m_summary->minTemp_box%2)+1 << " ";
 
 
                   //serial2->printf(printbuff.str().c_str());
