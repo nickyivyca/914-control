@@ -28,6 +28,7 @@ target_sources(${APP_TARGET}
         src/Main.cpp
         src/BmsThread.cpp
         src/LTC6813.cpp
+        src/MCP23017.cpp
 )
 
 target_link_libraries(${APP_TARGET}

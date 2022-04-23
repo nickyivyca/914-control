@@ -1,6 +1,7 @@
 #pragma once
 
 #include "mbed.h"
+#include "MCP23017.h"
 
 #ifndef PIN_SERIAL2_TX
 #define PIN_SERIAL2_TX p9
@@ -72,6 +73,24 @@
 
 
 //
+// I2C Configuration
+//
+
+// I2C SDA
+#ifndef PIN_I2C_SDA
+#define PIN_I2C_SDA p28
+#endif
+
+// I2C SCL
+#ifndef PIN_I2C_SCL
+#define PIN_I2C_SCL p27
+#endif
+
+#ifndef MCP_ADDRESS
+#define MCP_ADDRESS (0x20 << 1)
+#endif
+
+//
 // CAN Configuration
 //
 
@@ -138,3 +157,5 @@ extern DigitalOut* DO_DriveEnable;
 extern DigitalOut* DO_ChargeEnable;
 
 extern DigitalIn* DI_ChargeSwitch;
+
+extern MCP23017* ioexp;

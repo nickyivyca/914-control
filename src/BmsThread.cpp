@@ -184,8 +184,8 @@ void BMSThread::threadWorker() {
     // Now time to crunch numbers
 
 
-    //if (!pecStatus) {
-    if (true) {
+    if (!pecStatus) {
+    //if (true) {
       m_mutex->lock();
       for (unsigned int i = 0; i < NUM_CHIPS; i++) {
 
@@ -426,12 +426,12 @@ void BMSThread::threadWorker() {
         *led2 = 0;          
       }
     } else {
-      std::bitset<8> pecprint(pecStatus);
+      //std::bitset<8> pecprint(pecStatus);
 
       mail_t *msg = m_outbox->alloc();
       msg->msg_event = BATT_ERR;
       m_outbox->put(msg);
-      std::cout << "PEC error! " << pecprint << '\n';
+      //std::cout << "PEC error! " << pecprint << '\n';
       *led3 = 1;
     }
 

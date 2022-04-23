@@ -16,10 +16,14 @@
 #include "DataThread.h"
 #include "Data.h"
 
+#include "MCP23017.h"
+
 
 BufferedSerial* serial;
 BufferedSerial* displayserial;
 CAN* canBus;
+
+MCP23017* ioexp;
 
 DigitalOut* led1;
 DigitalOut* led2;
@@ -121,7 +125,16 @@ int main() {
         inbox_main.free(msg);
 
       }
+
     }
+
+    /*char i2ctest;
+    const uint8_t addr_iodir = 0x00;
+    i2ctest = ioexp->readRegister(IODIR);
+    std::cout << "Read: " << std::hex << (int)i2ctest << "\n";*/
+
+
+
     //std::cout << "Looping main while " << (MAIN_PERIOD - (t.read_ms()%MAIN_PERIOD)) << '\n';
 
     /*blink++;
@@ -156,6 +169,8 @@ void initIO() {
   DO_ChargeEnable = new DigitalOut(PIN_DO_CHARGEENABLE);
 
   DI_ChargeSwitch = new DigitalIn(PIN_DI_CHARGESWITCH);
+
+  ioexp = new MCP23017(PIN_I2C_SDA, PIN_I2C_SCL, MCP_ADDRESS);
 
   *DO_BattContactor = 0;
   *DO_BattContactor2 = 0;
