@@ -25,6 +25,9 @@ CAN* canBus;
 
 MCP23017* ioexp;
 
+PwmOut* fuelgauge;
+PwmOut* tach;
+
 DigitalOut* led1;
 DigitalOut* led2;
 DigitalOut* led3;
@@ -134,6 +137,30 @@ int main() {
     std::cout << "Read: " << std::hex << (int)i2ctest << "\n";*/
 
 
+    /*uint32_t readbase = t.read_us();
+    if (ioexp->read_bit(15)) {
+      std::cout << "\nB7 high\n";
+    } else {
+      std::cout << "\nB7 low\n";
+    }
+    if (ioexp->read_bit(14)) {
+      std::cout << "B6 high\n";
+    } else {
+      std::cout << "B6 low\n";
+    }
+    if (ioexp->read_bit(13)) {
+      std::cout << "B5 high\n";
+    } else {
+      std::cout << "B5 low\n";
+    }
+    if (ioexp->read_bit(12)) {
+      std::cout << "B4 high\n";
+    } else {
+      std::cout << "B4 low\n";
+    }
+
+    std::cout << "4x read time: " << (int)(t.read_us() - readbase) << "\n";*/
+
 
     //std::cout << "Looping main while " << (MAIN_PERIOD - (t.read_ms()%MAIN_PERIOD)) << '\n';
 
@@ -170,7 +197,13 @@ void initIO() {
 
   DI_ChargeSwitch = new DigitalIn(PIN_DI_CHARGESWITCH);
 
-  ioexp = new MCP23017(PIN_I2C_SDA, PIN_I2C_SCL, MCP_ADDRESS);
+  ioexp = new MCP23017(PIN_I2C_SDA, PIN_I2C_SCL, MCP_ADDRESS, 1000000);
+  ioexp->config(0b1111100000000000, 0b0001100000000000, 0);
+
+  fuelgauge = new PwmOut(PIN_PWM_FUELGAUGE);
+  tach = new PwmOut(PIN_PWM_TACH); //config on tach TBD
+
+  fuelgauge->period_us(100);
 
   *DO_BattContactor = 0;
   *DO_BattContactor2 = 0;

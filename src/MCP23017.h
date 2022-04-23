@@ -68,7 +68,7 @@ public:
      * @param   scl         I2C clock pin
      * @param   i2cAddress  I2C address
      */
-    MCP23017(PinName sda, PinName scl, int i2cAddress);
+    MCP23017(PinName sda, PinName scl, int i2cAddress, int i2cfrequency);
 
     /** Reset MCP23017 device to its power-on state
      */    

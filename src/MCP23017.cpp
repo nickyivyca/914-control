@@ -38,8 +38,9 @@ union {
 /*-----------------------------------------------------------------------------
  *
  */
-MCP23017::MCP23017(PinName sda, PinName scl, int i2cAddress)  : _i2c(sda, scl) {
+MCP23017::MCP23017(PinName sda, PinName scl, int i2cAddress, int i2cfrequency)  : _i2c(sda, scl) {
     MCP23017_i2cAddress = i2cAddress;
+    _i2c.frequency(i2cfrequency);
     reset();                                  // initialise chip to power-on condition
 }
 

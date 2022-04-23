@@ -21,20 +21,6 @@
 // IO Configuration
 //
 
-// Charger output
-//
-// To be pulled high to enable charger
-#ifndef PIN_CHARGER_CONTROL
-#define PIN_CHARGER_CONTROL NC
-#endif
-
-// Charger output
-//
-// Controls BMS fault light on dash (and beeper?)
-#ifndef PIN_BMS_FAULT_CONTROL
-#define PIN_BMS_FAULT_CONTROL NC
-#endif
-
 // Throttle input
 #ifndef PIN_SIG_THROTTLE
 #define PIN_SIG_THROTTLE NC
@@ -43,8 +29,6 @@
 #ifndef PIN_SIG_BRAKE
 #define PIN_SIG_BRAKE NC
 #endif
-
-
 
 
 //
@@ -146,6 +130,14 @@ extern CAN* canBus;
 #define PIN_DI_CHARGESWITCH p17
 #endif
 
+#ifndef PIN_PWM_TACH
+#define PIN_PWM_TACH p22
+#endif
+
+#ifndef PIN_PWM_FUELGAUGE
+#define PIN_PWM_FUELGAUGE p21
+#endif
+
 extern DigitalOut* led1;
 extern DigitalOut* led2;
 extern DigitalOut* led3;
@@ -159,3 +151,26 @@ extern DigitalOut* DO_ChargeEnable;
 extern DigitalIn* DI_ChargeSwitch;
 
 extern MCP23017* ioexp;
+
+extern PwmOut* fuelgauge;
+extern PwmOut* tach;
+
+#ifndef MCP_PIN_BMSERR
+#define MCP_PIN_BMSERR 0
+#endif
+
+#ifndef MCP_PIN_EGR
+#define MCP_PIN_EGR 1
+#endif
+
+#ifndef MCP_PIN_G // Light labeled G on leftmost gauge
+#define MCP_PIN_G 2
+#endif
+
+#ifndef MCP_PIN_BIGB // Big light labeled B on leftmost gauge
+#define MCP_PIN_BIGB 3
+#endif
+
+#ifndef MCP_PIN_LOWFUEL
+#define MCP_PIN_LOWFUEL 4
+#endif
