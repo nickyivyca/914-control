@@ -55,6 +55,11 @@ int main() {
 
   uint8_t blink = 0;
 
+ /*float fueltest = 1;
+  uint32_t tachtest = 4000;
+  uint8_t soctest = 0;
+  float tachdutytest = 1;*/
+
   SPI* spiDriver = new SPI(PIN_6820_SPI_MOSI,
                            PIN_6820_SPI_MISO,
                            PIN_6820_SPI_SCLK,
@@ -76,7 +81,7 @@ int main() {
   Timer t;
   t.start();
   while (1) {
-    if (!inbox_main.empty()) {
+    while(!inbox_main.empty()) {
       osEvent evt = inbox_main.get();
 
       if (evt.status == osEventMail) {
@@ -130,6 +135,53 @@ int main() {
       }
 
     }
+
+    /*fuelgauge->write(fueltest);
+    fueltest -= 0.05;
+    if (fueltest < 0.5) {
+      fueltest = 1;
+    }*/
+
+    // default (0.5?) duty cycle
+    // 10000us = ~3000rpm
+    // 15000us = norpm
+    // 6000us = ~4800rpm
+    // 12500 = ~23-2400rpm
+    // 
+
+    //float tachperiod = 1.0/tachtest;
+    //tach->period_us(tachtest);
+
+    //tach->period_us(15000);
+    //tach->pulsewidth_us(3000);
+    /*fuelgauge->write(0.5 + (0.005*soctest));
+    //tach->write(tachdutytest);
+    // tachtest += 100;
+    // if (tachtest > 20000) {
+    //   tachtest = 4000;
+    // }
+    tachdutytest -= 0.005;
+    if (tachdutytest < 0.4) {
+      tachdutytest = 1;
+    }
+    if (soctest < 15) {
+      ioexp->write_mask(1 << MCP_PIN_LOWFUEL, 0xff);
+    } else if (soctest >= 15 && soctest < 30) {      
+      ioexp->write_mask(1 << MCP_PIN_G, 0xff);
+    } else if (soctest >= 30 && soctest < 45) {      
+      ioexp->write_mask(1 << MCP_PIN_BIGB, 0xff);
+    } else if (soctest >= 45 && soctest < 60) {      
+      ioexp->write_mask(1 << MCP_PIN_EGR, 0xff);
+    } else if (soctest >= 60 && soctest < 61) {      
+      ioexp->write_mask(1 << MCP_PIN_BMSERR, 0xff);
+    } else {
+      ioexp->write_mask(0, 0xff);
+    }
+    soctest++;
+    if (soctest > 100) {
+      soctest = 0;
+    }
+    std::cout << "soc: " << (int)soctest << "\n";*/
 
     /*char i2ctest;
     const uint8_t addr_iodir = 0x00;
@@ -200,10 +252,16 @@ void initIO() {
   ioexp = new MCP23017(PIN_I2C_SDA, PIN_I2C_SCL, MCP_ADDRESS, 1000000);
   ioexp->config(0b1111100000000000, 0b0001100000000000, 0);
 
-  fuelgauge = new PwmOut(PIN_PWM_FUELGAUGE);
-  tach = new PwmOut(PIN_PWM_TACH); //config on tach TBD
+  ioexp->write_mask(0, 0xff);
 
-  fuelgauge->period_us(100);
+  fuelgauge = new PwmOut(PIN_PWM_FUELGAUGE);
+  //tach = new PwmOut(PIN_PWM_TACH); //config on tach TBD
+
+  fuelgauge->period_ms(1);
+  //tach->period_ms(2);
+  fuelgauge->write(0.1);
+  //tach->write(0.5);
+
 
   *DO_BattContactor = 0;
   *DO_BattContactor2 = 0;

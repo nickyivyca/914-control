@@ -155,22 +155,31 @@ extern MCP23017* ioexp;
 extern PwmOut* fuelgauge;
 extern PwmOut* tach;
 
+
+#ifndef MCP_PIN_BIT
+#define MCP_PIN_BIT(x) (1 << x)
+#endif
+
 #ifndef MCP_PIN_BMSERR
-#define MCP_PIN_BMSERR 0
+#define MCP_PIN_BMSERR 7
 #endif
 
 #ifndef MCP_PIN_EGR
-#define MCP_PIN_EGR 1
+#define MCP_PIN_EGR 4
 #endif
 
 #ifndef MCP_PIN_G // Light labeled G on leftmost gauge
-#define MCP_PIN_G 2
+#define MCP_PIN_G 0
 #endif
 
 #ifndef MCP_PIN_BIGB // Big light labeled B on leftmost gauge
-#define MCP_PIN_BIGB 3
+#define MCP_PIN_BIGB 5
 #endif
 
 #ifndef MCP_PIN_LOWFUEL
-#define MCP_PIN_LOWFUEL 4
+#define MCP_PIN_LOWFUEL 3
+#endif
+
+#ifndef MCP_BMS_THREAD_MASK
+#define MCP_BMS_THREAD_MASK MCP_PIN_BIT(MCP_PIN_LOWFUEL) | MCP_PIN_BIT(MCP_PIN_BMSERR) | MCP_PIN_BIT(MCP_PIN_EGR)
 #endif

@@ -29,7 +29,7 @@
 #endif
 
 #ifndef MAIN_PERIOD
-#define MAIN_PERIOD 10
+#define MAIN_PERIOD 50
 #endif
 
 // #ifndef TESTBALANCE
@@ -75,6 +75,10 @@ enum thread_message {INIT_ALL, NEW_CELL_DATA, BATT_ERR, BATT_STARTUP, CHARGE_ENA
 // Units: millivolts
 #ifndef BMS_FAULT_VOLTAGE_THRESHOLD_LOW
 #define BMS_FAULT_VOLTAGE_THRESHOLD_LOW 3000
+#endif
+
+#ifndef BMS_SOC_RESERVE_THRESHOLD
+#define BMS_SOC_RESERVE_THRESHOLD 18
 #endif
 
 // Threshold when cells will be discharged when discharging is enabled.

@@ -110,6 +110,8 @@ void BMSThread::threadWorker() {
     int totalCurrent = 0;
     m_batterydata->numBalancing = 0;
 
+    uint16_t ioexp_bits = 0;
+
 
     int m_frequency = *DI_ChargeSwitch? CELL_SENSE_FREQUENCY_CHARGE : CELL_SENSE_FREQUENCY;
     int m_delay =  1000/m_frequency;
@@ -243,12 +245,14 @@ void BMSThread::threadWorker() {
               //serial->printf("***** BMS LOW VOLTAGE FAULT *****\nVoltage at %d\n\n", voltage);
               throwBmsFault();
               voltagecheckOK = false;
+              ioexp_bits |= (1 << MCP_PIN_BMSERR);
             }
             if (voltage <= BMS_FAULT_VOLTAGE_THRESHOLD_LOW) {
               // Set fault line
               //serial->printf("***** BMS HIGH VOLTAGE FAULT *****\nVoltage at %d\n\n", voltage);
               throwBmsFault();
               voltagecheckOK = false;
+              ioexp_bits |= (1 << MCP_PIN_BMSERR);
             }
 
             // Discharge cells if enabled
@@ -337,15 +341,25 @@ void BMSThread::threadWorker() {
       }
 
       if (!SoCinitialized) {
+        if (minVoltage < SoC_lookup[0]) {
+          SoC = 0;
+          millicoulombs = 0;
+          SoCinitialized = true;
+        } else {
         //printf("Min voltage is  %u\n", minVoltage);
-        for (uint8_t j = 0; j < 101; j++) {
-          if (minVoltage >= SoC_lookup[j] && minVoltage < SoC_lookup[j+1]) {
-            SoC = j;
-            SoCinitialized = true;
-            millicoulombs = mc_lookup[SoC];
-            //printf("SoC initialized to %u with %d coulombs to 0\n", SoC, millicoulombs/1000);
-            break;
+          for (uint8_t j = 0; j < 101; j++) {
+            if (minVoltage >= SoC_lookup[j] && minVoltage < SoC_lookup[j+1]) {
+              SoC = j;
+              SoCinitialized = true;
+              millicoulombs = mc_lookup[SoC];
+              //printf("SoC initialized to %u with %d coulombs to 0\n", SoC, millicoulombs/1000);
+              break;
+            }
           }
+        }
+        fuelgauge->write(0.5 + (0.005*SoC));
+        if (SoC < BMS_SOC_RESERVE_THRESHOLD) {
+          ioexp_bits |= (1 << MCP_PIN_LOWFUEL);
         }
       } else {
         millicoulombs -= totalCurrent/m_frequency;
@@ -355,6 +369,11 @@ void BMSThread::threadWorker() {
           for (uint8_t j = 0; j < 101; j++) {
             if (millicoulombs >= mc_lookup[j] && millicoulombs < mc_lookup[j+1]) {
               SoC = j;
+
+              fuelgauge->write(0.5 + (0.005*SoC));
+              if (SoC < BMS_SOC_RESERVE_THRESHOLD) {
+                ioexp_bits |= (1 << MCP_PIN_LOWFUEL);
+              }
               break;
             }
           }
@@ -432,8 +451,11 @@ void BMSThread::threadWorker() {
       msg->msg_event = BATT_ERR;
       m_outbox->put(msg);
       //std::cout << "PEC error! " << pecprint << '\n';
-      *led3 = 1;
+      *led3 = 1;      
+      ioexp_bits |= (1 << MCP_PIN_EGR);
     }
+
+    ioexp->write_mask(ioexp_bits, MCP_BMS_THREAD_MASK);
 
 
     /*uint16_t mean = (totalVoltage/(NUM_CELLS_PER_CHIP*NUM_CHIPS));
