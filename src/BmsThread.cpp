@@ -49,7 +49,7 @@ uint16_t voltages[NUM_CHIPS][18];
 uint16_t gpio_adc[NUM_CHIPS][2];
 //uint8_t dieTemps[NUM_CHIPS];
 
-float currentZero;
+int32_t currentZero;
 bool currentZeroed = false;
 bool SoCinitialized = false;
 uint8_t SoC;
@@ -286,11 +286,12 @@ void BMSThread::threadWorker() {
         // Calculate current sensor
         if (i == ISENSE_LOCATION) {
           if (!currentZeroed) {
-            currentZero = gpio_adc[i][0]/10000.0;
+            currentZero = gpio_adc[i][0] - gpio_adc[i][1];
+            //std::cout << "CurrentZero: " << currentZero << '\n';
             currentZeroed = true;
           }
           // replace 2.497 with zero'd value from startup? maybe use ref
-          int current = (ISENSE_RANGE * (gpio_adc[i][0]/10000.0 - currentZero) / 0.625) * 1000.0; // unit mA
+          int current = (ISENSE_RANGE * (gpio_adc[i][0] - gpio_adc[i][1] - currentZero)/10 / 0.625); // unit mA
           totalCurrent += current;
           //std::cout << "Current: " << current << '\n';
         }
@@ -301,7 +302,7 @@ void BMSThread::threadWorker() {
             // calculate resistance from voltage
             float thermvolt = gpio_adc[i][j]/10000.0;
             float resistance;
-            if (i == 2) {
+            if (i == 4) {
               resistance = (10000.0 * thermvolt)/(5.0 - thermvolt);
             } else {
               resistance = (4700.0 * thermvolt)/(5.0 - thermvolt);
