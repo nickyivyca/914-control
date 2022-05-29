@@ -209,7 +209,7 @@ void BMSThread::threadWorker() {
 
           int index = BMS_CELL_MAP[j];
           if (index != -1) {
-            if ((i != 2 && i != 3)) {
+            if ((i != 4 && i != 5)) {
               // add 5mV for top of cellbox and bottom of cellbox
               if ((i%2 && index == 13) || (!i%2 && index == 0)) {
                 voltage += 5;
