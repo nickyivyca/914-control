@@ -179,10 +179,12 @@ class DataThread {
                   printbuff.str("");*/
                   //uint32_t curtime = t.read_us();
 
-                  int64_t wh = m_summary->joules/3600;
+                  float kwh = ((float)m_summary->joules)/3600000.0;
+
+                  printbuff.setf(ios::fixed,ios::floatfield);
 
                   printbuff << setw(3) << m_summary->totalCurrent/1000 << "A " << setw(3) << m_summary->totalVoltage/1000 << "V" 
-                  << setw(3) << wh/1000 << "." << abs((wh%1000)/100) << "kWhr "
+                  << setw(6) << setprecision(1) << std::showpoint << std::right << kwh << "kWhr"
                   << "\r-:" << setw(3) << m_summary->minVoltage/10 << " +:" << setw(3) << m_summary->maxVoltage/10
                   << " A:" << setw(3) << m_summary->totalVoltage/(NUM_CELLS_PER_CHIP*NUM_CHIPS)/10
                   /*<< "\r " << (char)('A'+(m_summary->maxVoltage_cell/28)) << setw(2) << (m_summary->maxVoltage_cell%28)+1
@@ -190,7 +192,8 @@ class DataThread {
                   << "\r+: " << setw(2) << (int)round(m_summary->maxTemp) << " " << (char)('A'+(m_summary->maxTemp_box/2)) << (m_summary->maxTemp_box%2)+1
                   << " -: " << setw(2) << (int)round(m_summary->minTemp) << " " << (char)('A'+(m_summary->minTemp_box/2)) << (m_summary->minTemp_box%2)+1 << " ";
 
-
+                  //std::cout.setf(ios::fixed,ios::floatfield);
+                  //std::cout << std::showpoint << setprecision(1) << setw(6) << kwh << "kWhr \n";
                   //serial2->printf(printbuff.str().c_str());
 
                   uint8_t dispprint[22] = {0x80, // Move to 0,0

@@ -242,14 +242,14 @@ void BMSThread::threadWorker() {
 
             if (voltage >= BMS_FAULT_VOLTAGE_THRESHOLD_HIGH) {
               // Set fault line
-              //serial->printf("***** BMS LOW VOLTAGE FAULT *****\nVoltage at %d\n\n", voltage);
+              //std::cout << "***** BMS LOW VOLTAGE FAULT *****\nVoltage at " << voltage << "\n\n";
               throwBmsFault();
               voltagecheckOK = false;
               ioexp_bits |= (1 << MCP_PIN_BMSERR);
             }
             if (voltage <= BMS_FAULT_VOLTAGE_THRESHOLD_LOW) {
               // Set fault line
-              //serial->printf("***** BMS HIGH VOLTAGE FAULT *****\nVoltage at %d\n\n", voltage);
+              //std::cout << "***** BMS HIGH VOLTAGE FAULT *****\nVoltage at " << voltage << "\n\n";
               throwBmsFault();
               voltagecheckOK = false;
               ioexp_bits |= (1 << MCP_PIN_BMSERR);
