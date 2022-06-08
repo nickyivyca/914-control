@@ -258,7 +258,7 @@ void BMSThread::threadWorker() {
             // Discharge cells if enabled
 
             LTC6813::Configuration& conf = m_6813bus->m_chips[i].getConfig();
-            if(*DI_ChargeSwitch && !faultThrown && m_discharging) {
+            if(*DI_ChargeSwitch && !faultThrown && m_discharging && BALANCE_EN) {
               if((voltage > prevMinVoltage) && (voltage - prevMinVoltage > BMS_DISCHARGE_THRESHOLD)) {
                 // Discharge
 
