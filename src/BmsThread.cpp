@@ -150,9 +150,20 @@ void BMSThread::threadWorker() {
 #ifdef TESTBALANCE
     //std::cout << "Balance index: " << (int)balance_index << "\n";
     balance_index++;
-    if (balance_index == 18) {
-      balance_index = 0;
+    switch (balance_index) {
+      case 16:
+        balance_index = 0;
+        break;
+      case 5:
+        balance_index = 6;
+        break;
+      case 11:
+        balance_index = 12;
+        break;
+      default:
+        break;
     }
+
 #endif
     m_bus->WakeupBus();
     m_6813bus->muteDischarge();
