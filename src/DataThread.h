@@ -39,7 +39,7 @@ class DataThread {
     void threadWorker() {
       Timer t;
       t.start();
-      uint32_t prevTime = 0;
+      //uint32_t prevTime = 0;
 
       uint32_t errCount = 0;
 
@@ -53,14 +53,18 @@ class DataThread {
             mail_t *msg = (mail_t *)evt.value.p;
 
 
-            uint32_t startTime = t.read_ms();
+            //uint32_t startTime = t.read_ms();
             switch(msg->msg_event) {
               case DATA_INIT:
                 {
                   //std::cout << "Data thread received init\n";
 
                   // Print CSV header
-                  printbuff << "time_millis,packVoltage,totalCurrent,kW,Whr,soc";
+                  printbuff << "time_millis,packVoltage";
+                  for (uint16_t i = 0; i < NUM_STRINGS; i++) {
+                    printbuff << ",current" << i;
+                  }
+                  printbuff << ",kW,Whr,soc";
                   //serial->printf(printbuff.str().c_str());
                   std::cout << printbuff.str();
                   printbuff.str(std::string());
@@ -99,7 +103,7 @@ class DataThread {
 
                   // add custom characters
                   uint8_t customchar = 0b00010000;
-                  uint8_t charindex = 0xf8;
+                  //uint8_t charindex = 0xf8;
                   //displayserial->putc(0x94);// move to second row to test characters
                   uint8_t charinit[9] = {0xf8, 0,0,0,0,0,0,0,0};
                   displayserial->write(charinit, 9);
@@ -137,8 +141,11 @@ class DataThread {
                   float totalCurrent_scaled = ((float)m_data->totalCurrent)/1000.0;
                   //std::cout << "Data thread received full data\n";
                   // Print line of CSV data
-                  printbuff << std::fixed << std::setprecision(1) << m_data->timestamp << ',' << m_data->packVoltage/1000.0 
-                  << ',' << totalCurrent_scaled << ',' << totalCurrent_scaled * m_data->packVoltage / 1000000.0 << ',' << m_data->joules/3600 << ',' << (int)m_data->soc;
+                  printbuff << std::fixed << std::setprecision(1) << m_data->timestamp << ',' << m_data->packVoltage/1000.0 ;
+                  for (uint16_t i = 0; i < NUM_STRINGS; i++) {
+                    printbuff << ',' << ((float)m_data->stringCurrents[i])/1000.0;
+                  }
+                  printbuff << ',' << totalCurrent_scaled * m_data->packVoltage / 1000000.0 << ',' << m_data->joules/3600 << ',' << (int)m_data->soc;
                   for (uint16_t i = 0; i < NUM_CHIPS * NUM_CELLS_PER_CHIP; i++) {
                     printbuff << ',' << m_data->allVoltages[i];
                   }
@@ -180,6 +187,8 @@ class DataThread {
                   //uint32_t curtime = t.read_us();
 
                   float kwh = ((float)m_summary->joules)/3600000.0;
+
+                  //uint16_t avgcell = 
 
                   printbuff.setf(ios::fixed,ios::floatfield);
 

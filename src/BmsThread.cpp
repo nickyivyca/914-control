@@ -49,12 +49,13 @@ uint16_t voltages[NUM_CHIPS][18];
 uint16_t gpio_adc[NUM_CHIPS][2];
 //uint8_t dieTemps[NUM_CHIPS];
 
-int32_t currentZero;
-bool currentZeroed = false;
+int32_t currentZero[NUM_STRINGS] = {0};
+bool currentZeroed[NUM_STRINGS] = {false};
 bool SoCinitialized = false;
 uint8_t SoC;
 bool startedUp = false;
 bool voltagecheckOK = true;
+bool stringcheckOK = true;
 bool faultThrown = false;
 int millicoulombs;
 
@@ -73,7 +74,9 @@ void BMSThread::throwBmsFault() {
 }
 void BMSThread::threadWorker() {
 
+#ifdef TESTBALANCE
   uint8_t balance_index = 0;
+#endif
   uint16_t prevMinVoltage = BMS_FAULT_VOLTAGE_THRESHOLD_HIGH;
 
   /*std::cout << "time_millis,totalCurrent";
@@ -85,7 +88,7 @@ void BMSThread::threadWorker() {
   for (uint16_t i = 0; i < NUM_CHIPS; i++) {
     std::cout << ",T_" << (char)('A'+(i/2)) << (i%2)+1;
   }*/
-  std::cout << '\n';
+  //std::cout << '\n';
   Timer t;
   t.start();
 
@@ -95,9 +98,9 @@ void BMSThread::threadWorker() {
 
 
   while (true) {
-    uint32_t startTime = t.read_ms();
+    //uint32_t startTime = t.read_ms();
 
-    uint32_t allBanksVoltage = 0;
+    uint32_t packVoltage = 0;
     uint16_t minVoltage = 0xFFFF;
     uint8_t minVoltage_cell = 255;
     uint16_t maxVoltage = 0x0000;
@@ -106,8 +109,8 @@ void BMSThread::threadWorker() {
     uint8_t minTemp_box = 255;
     float maxTemp = std::numeric_limits<float>::min();
     uint8_t maxTemp_box = 255;
-    unsigned int totalVoltage = 0;
-    int totalCurrent = 0;
+    unsigned int totalVoltage[NUM_STRINGS];
+    //stringCurrents[NUM_STRINGS] = 0;
     m_batterydata->numBalancing = 0;
 
     uint16_t ioexp_bits = 0;
@@ -200,154 +203,160 @@ void BMSThread::threadWorker() {
     if (!pecStatus) {
     //if (true) {
       m_mutex->lock();
-      for (unsigned int i = 0; i < NUM_CHIPS; i++) {
+      for (uint8_t string = 0; string < NUM_STRINGS; string++) {
+        for (unsigned int i = 0; i < NUM_CHIPS/NUM_STRINGS; i++) {
+          uint8_t chip_loc = BMS_CHIP_MAP[string][i];
 
-        //serial->printf("Chip %d: Die Temp: %d\n", i, dieTemps[i]);
+          //serial->printf("Chip %d: Die Temp: %d\n", i, dieTemps[i]);
 
-        /*std::cout << "Sum: " << statuses[i].sumAllCells
-        << "\nInternal Temp: " << statuses[i].internalTemperature
-        << "\nAnalog Reference: " << statuses[i].voltageAnalog
-        << "\nDigital Reference: " << statuses[i].voltageDigital
-        << "\n";*/
-        //totalVoltage += statuses[i].sumAllCells;
-
-
-        // Process voltages
-        //serial->printf("Voltages: ");
-        for (int j = 0; j < 18; j++) {
-          uint16_t voltage = voltages[i][j] / 10;
+          /*std::cout << "Sum: " << statuses[i].sumAllCells
+          << "\nInternal Temp: " << statuses[i].internalTemperature
+          << "\nAnalog Reference: " << statuses[i].voltageAnalog
+          << "\nDigital Reference: " << statuses[i].voltageDigital
+          << "\n";*/
+          //totalVoltage += statuses[i].sumAllCells;
 
 
-          int index = BMS_CELL_MAP[j];
-          if (index != -1) {
-            if ((i != 4 && i != 5)) {
-              // add 5mV for top of cellbox and bottom of cellbox
-              if ((i%2 && index == 13) || (!i%2 && index == 0)) {
-                voltage += 5;
+          // Process voltages
+          //serial->printf("Voltages: ");
+          for (int j = 0; j < 18; j++) {
+            uint16_t voltage = voltages[chip_loc][j] / 10;
+
+
+            int index = BMS_CELL_MAP[j];
+            if (index != -1) {
+              if ((chip_loc == 6 || chip_loc == 7 || chip_loc == 8 || chip_loc == 9)) {
+                // add 5mV for top of cellbox and bottom of cellbox
+                if ((i%2 && index == 13) || (!i%2 && index == 0)) {
+                  voltage += 5;
+                }
+                // add 7 mV for top of cellbox for current sense
+                // only works if there are no additional current sensors on the string!
+                if (chip_loc == BMS_ISENSE_MAP[string] && index == 13) {
+                  voltage += 7;
+                }
               }
-              // add 7 mV for top of cellbox for current sense
-              if (i == ISENSE_LOCATION && index == 13) {
-                voltage += 7;
+              // adjust for 15mV offset due to current sensor
+              if (((BMS_ISENSE_MAP[string]%2 && chip_loc == BMS_ISENSE_MAP[string]+1) ||
+                (!BMS_ISENSE_MAP[string]%2 && chip_loc == BMS_ISENSE_MAP[string]-1)) && index == 13) {
+                voltage -= 15;
               }
-            }
-            // adjust for 15mV offset due to current sensor
-            if (i == ISENSE_LOCATION-1 && index == 13) {
-              voltage -= 15;
-            }
-            if (i == ISENSE_LOCATION && index == 0) {
-              voltage += 15;
-            }
-            m_batterydata->allVoltages[(NUM_CELLS_PER_CHIP * i) + index] = voltage;
-            totalVoltage += voltage;
+              if (chip_loc == BMS_ISENSE_MAP[string] && index == 0) {
+                voltage += 15;
+              }
+              m_batterydata->allVoltages[string][(NUM_CELLS_PER_CHIP * i) + index] = voltage;
+              totalVoltage[string] += voltage;
 
-            if (voltage < minVoltage && voltage != 0) {
-              minVoltage = voltage;
-              minVoltage_cell = index + 14*i;
-            }
-            if (voltage > maxVoltage) {
-              maxVoltage = voltage;
-              maxVoltage_cell = index + 14*i;
-            }
-            //totalVoltage += voltage;
-            //serial->printf("%dmV ", voltage);
+              if (voltage < minVoltage && voltage != 0) {
+                minVoltage = voltage;
+                minVoltage_cell = index + 14*i;
+              }
+              if (voltage > maxVoltage) {
+                maxVoltage = voltage;
+                maxVoltage_cell = index + 14*i;
+              }
+              //totalVoltage += voltage;
+              //serial->printf("%dmV ", voltage);
 
-            if (voltage >= BMS_FAULT_VOLTAGE_THRESHOLD_HIGH) {
-              // Set fault line
-              //std::cout << "***** BMS LOW VOLTAGE FAULT *****\nVoltage at " << voltage << "\n\n";
-              throwBmsFault();
-              voltagecheckOK = false;
-              ioexp_bits |= (1 << MCP_PIN_BMSERR);
-            }
-            if (voltage <= BMS_FAULT_VOLTAGE_THRESHOLD_LOW) {
-              // Set fault line
-              //std::cout << "***** BMS HIGH VOLTAGE FAULT *****\nVoltage at " << voltage << "\n\n";
-              throwBmsFault();
-              voltagecheckOK = false;
-              ioexp_bits |= (1 << MCP_PIN_BMSERR);
-            }
+              if (voltage >= BMS_FAULT_VOLTAGE_THRESHOLD_HIGH) {
+                // Set fault line
+                //std::cout << "***** BMS LOW VOLTAGE FAULT *****\nVoltage at " << voltage << "\n\n";
+                throwBmsFault();
+                voltagecheckOK = false;
+                ioexp_bits |= (1 << MCP_PIN_BMSERR);
+              }
+              if (voltage <= BMS_FAULT_VOLTAGE_THRESHOLD_LOW) {
+                // Set fault line
+                //std::cout << "***** BMS HIGH VOLTAGE FAULT *****\nVoltage at " << voltage << "\n\n";
+                throwBmsFault();
+                voltagecheckOK = false;
+                ioexp_bits |= (1 << MCP_PIN_BMSERR);
+              }
 
-            // Discharge cells if enabled
+              // Discharge cells if enabled
 
-            LTC6813::Configuration& conf = m_6813bus->m_chips[i].getConfig();
-            if(*DI_ChargeSwitch && !faultThrown && m_discharging && BALANCE_EN) {
-              if((voltage > prevMinVoltage) && (voltage - prevMinVoltage > BMS_DISCHARGE_THRESHOLD)) {
-                // Discharge
+              LTC6813::Configuration& conf = m_6813bus->m_chips[chip_loc].getConfig();
+              if(*DI_ChargeSwitch && !faultThrown && m_discharging && BALANCE_EN) {
+                if((voltage > prevMinVoltage) && (voltage - prevMinVoltage > BMS_DISCHARGE_THRESHOLD)) {
+                  // Discharge
 
-                //serial->printf("DISCHARGE CHIP: %d CELL: %d: %dmV (%dmV)\n", i, index, voltage, (voltage - prevMinVoltage));
+                  //serial->printf("DISCHARGE CHIP: %d CELL: %d: %dmV (%dmV)\n", i, index, voltage, (voltage - prevMinVoltage));
 
-                // Enable discharging
-                conf.dischargeState.value |= (1 << j);
-                m_batterydata->numBalancing++;
+                  // Enable discharging
+                  conf.dischargeState.value |= (1 << j);
+                  m_batterydata->numBalancing++;
+                } else {
+                  // Disable discharging
+                  conf.dischargeState.value &= ~(1 << j);
+                }
               } else {
                 // Disable discharging
                 conf.dischargeState.value &= ~(1 << j);
               }
-            } else {
-              // Disable discharging
-              conf.dischargeState.value &= ~(1 << j);
             }
           }
-        }
-        /*if (*DI_ChargeSwitch) {
-          LTC6813::Configuration& conf = m_6813bus->m_chips[i].getConfig();
-          std::bitset<16> balancemap(conf.dischargeState.value);
-          std::cout << "Chip " << (int)i << " balance: " << balancemap << '\n';
-        }*/
-        //serial->printf("\n");
-        // Calculate current sensor
-        if (i == ISENSE_LOCATION) {
-          if (!currentZeroed) {
-            currentZero = gpio_adc[i][0] - gpio_adc[i][1];
-            //std::cout << "CurrentZero: " << currentZero << '\n';
-            currentZeroed = true;
+          /*if (*DI_ChargeSwitch) {
+            LTC6813::Configuration& conf = m_6813bus->m_chips[i].getConfig();
+            std::bitset<16> balancemap(conf.dischargeState.value);
+            std::cout << "Chip " << (int)i << " balance: " << balancemap << '\n';
+          }*/
+          //serial->printf("\n");
+          // Calculate current sensor
+          if (chip_loc == BMS_ISENSE_MAP[string]) {
+            if (!currentZeroed[string]) {
+              currentZero[string] = gpio_adc[i][0] - gpio_adc[i][1];
+              //std::cout << "CurrentZero: " << currentZero << '\n';
+              currentZeroed[string] = true;
+            }
+            // replace 2.497 with zero'd value from startup? maybe use ref
+            m_batterydata->stringCurrents[string] = BMS_ISENSE_DIR[string]*
+              (BMS_ISENSE_RANGE[string] * (gpio_adc[i][0] - gpio_adc[i][1] - currentZero[string])/10 / 0.625); // unit mA
+            m_batterydata->totalCurrent += m_batterydata->stringCurrents[string];
+            //std::cout << "Current: " << current << '\n';
           }
-          // replace 2.497 with zero'd value from startup? maybe use ref
-          int current = (ISENSE_RANGE * (gpio_adc[i][0] - gpio_adc[i][1] - currentZero)/10 / 0.625); // unit mA
-          totalCurrent += current;
-          //std::cout << "Current: " << current << '\n';
-        }
 
-        // Calculate thermistors: present on even chips (lower chip of each box)
-        if (!(i % 2)) {
-          for (uint8_t j = 0; j < 2; j++) {
-            // calculate resistance from voltage
-            float thermvolt = gpio_adc[i][j]/10000.0;
-            float resistance;
-            if (i == 4) {
-              resistance = (10000.0 * thermvolt)/(5.0 - thermvolt);
-            } else {
-              resistance = (4700.0 * thermvolt)/(5.0 - thermvolt);
+          // Calculate thermistors: present on even chips (lower chip of each box)
+          if (!(i % 2)) {
+            for (uint8_t j = 0; j < 2; j++) {
+              // calculate resistance from voltage
+              float thermvolt = gpio_adc[i][j]/10000.0;
+              float resistance;
+              if (chip_loc == 6 || chip_loc == 7 || chip_loc == 8 || chip_loc == 9) {
+                resistance = (10000.0 * thermvolt)/(5.0 - thermvolt);
+              } else {
+                resistance = (4700.0 * thermvolt)/(5.0 - thermvolt);
+              }
+              //std::cout << "Calculated resistance " << j+1 << ":  " << resistance << "\n";
+
+              // https://github.com/panStamp/thermistor/blob/master/thermistor.cpp
+              float steinhart;
+              steinhart = resistance / 10000.0;     // (R/Ro)
+              steinhart = log(steinhart);                  // ln(R/Ro)
+              steinhart /= 3380.0;                   // 1/B * ln(R/Ro)
+              steinhart += 1.0 / (25.0 + 273.15); // + (1/To)
+              steinhart = 1.0 / steinhart;                 // Invert
+              steinhart -= 273.15;                         // convert to C
+              steinhart = ceil(steinhart * 10.0) / 10.0;   // round to 1 decimal place
+
+
+              if (!isnan(steinhart)) {
+                m_batterydata->allTemperatures[i+j] = steinhart;
+                //std::cout << "NTC " << j+1 << ": " << steinhart << '\n';
+                if (steinhart < minTemp && steinhart != 0){
+                  minTemp = steinhart;
+                  minTemp_box = j + i;
+                }
+                if (steinhart > maxTemp) {
+                  maxTemp = steinhart;
+                  maxTemp_box = j + i;
+                }
+                // max temp check
+                if (steinhart > BMS_TEMPERATURE_THRESHOLD && *DI_ChargeSwitch) {
+                  throwBmsFault();
+                }
+              }
+
             }
-            //std::cout << "Calculated resistance " << j+1 << ":  " << resistance << "\n";
-
-            // https://github.com/panStamp/thermistor/blob/master/thermistor.cpp
-            float steinhart;
-            steinhart = resistance / 10000.0;     // (R/Ro)
-            steinhart = log(steinhart);                  // ln(R/Ro)
-            steinhart /= 3380.0;                   // 1/B * ln(R/Ro)
-            steinhart += 1.0 / (25.0 + 273.15); // + (1/To)
-            steinhart = 1.0 / steinhart;                 // Invert
-            steinhart -= 273.15;                         // convert to C
-            steinhart = ceil(steinhart * 10.0) / 10.0;   // round to 1 decimal place
-
-
-            if (!isnan(steinhart)) {
-              m_batterydata->allTemperatures[i+j] = steinhart;
-              //std::cout << "NTC " << j+1 << ": " << steinhart << '\n';
-              if (steinhart < minTemp && steinhart != 0){
-                minTemp = steinhart;
-                minTemp_box = j + i;
-              }
-              if (steinhart > maxTemp) {
-                maxTemp = steinhart;
-                maxTemp_box = j + i;
-              }
-              // max temp check
-              if (steinhart > BMS_TEMPERATURE_THRESHOLD && *DI_ChargeSwitch) {
-                throwBmsFault();
-              }
-            }
-
           }
         }
       }
@@ -374,7 +383,7 @@ void BMSThread::threadWorker() {
           ioexp_bits |= (1 << MCP_PIN_LOWFUEL);
         }
       } else {
-        millicoulombs -= totalCurrent/m_frequency;
+        millicoulombs -= m_batterydata->totalCurrent/m_frequency;
         if (millicoulombs < 0) {
           SoC = 0;
         } else {
@@ -392,10 +401,28 @@ void BMSThread::threadWorker() {
         }
         //printf("Current of %dmA MC at %u SoC at %u\n", totalCurrent, millicoulombs, SoC);
       }
+      
+      *led3 = 0;
+      for (uint8_t i = 0; i < NUM_STRINGS; i++) {
+        packVoltage += totalVoltage[i];
+      }
+      packVoltage /= NUM_STRINGS;
+
+
+
+      // check difference between strings
+      for (uint8_t i = 0; i < NUM_STRINGS; i++) {
+        if (abs((int)totalVoltage[i] - (int)packVoltage) > BMS_STRING_DIFFERENCE_THRESHOLD) {
+          stringcheckOK = false;
+          *led3 = 1;      
+          ioexp_bits |= (1 << MCP_PIN_EGR);
+          break;
+        }
+      }
     
 
-      float totalVoltage_scaled = ((float)totalVoltage)/1000.0;
-      float totalCurrent_scaled = ((float)totalCurrent)/1000.0;
+      //float totalVoltage_scaled = ((float)totalVoltage)/1000.0;
+      //float totalCurrent_scaled = ((float)m_batterydata->totalCurrent)/1000.0;
 
       /*std::cout << "Pack Voltage: " << ceil(totalVoltage_scaled * 10.0) / 10.0 << "V"  // round to 1 decimal place
       << " Current: " << totalCurrent_scaled << "A"
@@ -416,17 +443,17 @@ void BMSThread::threadWorker() {
       m_batterysummary->minTemp_box = minTemp_box;
       m_batterysummary->maxTemp = maxTemp;
       m_batterysummary->maxTemp_box = maxTemp_box;
-      m_batterysummary->totalCurrent = totalCurrent;
-      m_batterysummary->totalVoltage = totalVoltage;
+      m_batterysummary->totalCurrent = m_batterydata->totalCurrent;
+      m_batterysummary->totalVoltage = packVoltage;
 
-      m_batterysummary->joules += ((totalCurrent/1000) * ((int32_t)(totalVoltage/1000))/m_frequency);
+      m_batterysummary->joules += ((m_batterydata->totalCurrent/1000) * ((int32_t)(packVoltage/1000))/m_frequency);
       m_batterydata->joules = m_batterysummary->joules;
 
       m_batterydata->soc = SoC;
       m_batterysummary->soc = SoC;
 
-      m_batterydata->totalCurrent = totalCurrent;
-      m_batterydata->packVoltage = totalVoltage;
+      //m_batterydata->totalCurrent = totalCurrent;
+      m_batterydata->packVoltage = packVoltage;
 
       prevMinVoltage = minVoltage;
 
@@ -436,7 +463,7 @@ void BMSThread::threadWorker() {
       msg->msg_event = NEW_CELL_DATA;
       m_outbox->put(msg);
 
-      *led3 = 0;
+
 
       if (!startedUp && voltagecheckOK) {
         *DO_BattContactor = 1;

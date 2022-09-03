@@ -53,7 +53,7 @@ int main() {
   // Init all io pins
   initIO();
 
-  uint8_t blink = 0;
+  //uint8_t blink = 0;
 
  /*float fueltest = 1;
   uint32_t tachtest = 4000;

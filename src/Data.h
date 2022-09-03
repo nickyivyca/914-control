@@ -8,9 +8,10 @@
 #endif
 
 typedef struct {
-  uint16_t allVoltages[NUM_CHIPS * NUM_CELLS_PER_CHIP];
+  uint16_t allVoltages[NUM_STRINGS][NUM_CHIPS * NUM_CELLS_PER_CHIP];
   float allTemperatures[NUM_CHIPS];
   uint8_t dieTemps[NUM_CHIPS];
+  int stringCurrents[NUM_STRINGS];
   uint8_t numBalancing;
   int totalCurrent;
   uint32_t timestamp;

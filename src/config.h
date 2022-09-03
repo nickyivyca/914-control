@@ -10,14 +10,9 @@
 #define NUM_CHIPS 6
 #endif
 
-// Nominal range of the LEM sensor
-#ifndef ISENSE_RANGE
-#define ISENSE_RANGE 200.0
-#endif
-
-// Chip number for where the LEM is plugged in, 0 indexed
-#ifndef ISENSE_LOCATION
-#define ISENSE_LOCATION 5
+// Number of strings of batteries
+#ifndef NUM_STRINGS
+#define NUM_STRINGS 1
 #endif
 
 #ifndef CELL_SENSE_FREQUENCY
@@ -49,13 +44,25 @@
 #define NUM_CELLS_PER_CHIP 14
 #endif
 
-const int BMS_CELL_MAP[18] = {0, 1, 2, 3, 4, -1, 5, 6, 7, 8, 9, -1, 10, 11, 12, 13, -1, -1};
+// Mapping of BMS chip channels to cells
+const int8_t BMS_CELL_MAP[18] = {0, 1, 2, 3, 4, -1, 5, 6, 7, 8, 9, -1, 10, 11, 12, 13, -1, -1};
+
+// Which chips constitute each string, in order
+const uint8_t BMS_CHIP_MAP[NUM_STRINGS][NUM_CHIPS/NUM_STRINGS] = {
+		{0, 1, 2, 3, 4, 5}};
+
+// Which chip (in the string, not in the mapping) has each string's current sensor
+const uint8_t BMS_ISENSE_MAP[NUM_STRINGS] = {5};
+
+const int8_t BMS_ISENSE_DIR[NUM_STRINGS] = {1};
+
+const float BMS_ISENSE_RANGE[NUM_STRINGS] = {200.0};
 
 enum thread_message {INIT_ALL, NEW_CELL_DATA, BATT_ERR, BATT_STARTUP, CHARGE_ENABLED, // to main
   BMS_INIT, BMS_READ, ENABLE_BALANCING, DISABLE_BALANCING, // to bms thread
   DATA_INIT, DATA_DATA, DATA_SUMMARY, DATA_ERR};    // to data thread
 
-// Value for 100% on the bar on the display
+// Power value for 100% on the bar on the display
 #ifndef DISP_FULL_SCALE
 #define DISP_FULL_SCALE 80000
 #endif
@@ -65,6 +72,10 @@ enum thread_message {INIT_ALL, NEW_CELL_DATA, BATT_ERR, BATT_STARTUP, CHARGE_ENA
 #define DISP_PER_BOX (DISP_FULL_SCALE/20)
 #endif
 
+// Threshold of difference between average battery string voltage and each string to close contactors
+#ifndef BMS_STRING_DIFFERENCE_THRESHOLD
+#define BMS_STRING_DIFFERENCE_THRESHOLD 500
+#endif
 
 
 // Upper threshold when fault will be thrown for cell voltage
