@@ -16,11 +16,11 @@
 #endif
 
 #ifndef CELL_SENSE_FREQUENCY
-#define CELL_SENSE_FREQUENCY 10
+#define CELL_SENSE_FREQUENCY 1
 #endif
 
 #ifndef CELL_SENSE_FREQUENCY_CHARGE
-#define CELL_SENSE_FREQUENCY_CHARGE 2
+#define CELL_SENSE_FREQUENCY_CHARGE 1
 #endif
 
 #ifndef MAIN_PERIOD
@@ -74,7 +74,7 @@ enum thread_message {INIT_ALL, NEW_CELL_DATA, BATT_ERR, BATT_STARTUP, CHARGE_ENA
 
 // Threshold of difference between average battery string voltage and each string to close contactors
 #ifndef BMS_STRING_DIFFERENCE_THRESHOLD
-#define BMS_STRING_DIFFERENCE_THRESHOLD 500
+#define BMS_STRING_DIFFERENCE_THRESHOLD 250
 #endif
 
 

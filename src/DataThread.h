@@ -60,33 +60,36 @@ class DataThread {
                   //std::cout << "Data thread received init\n";
 
                   // Print CSV header
-                  printbuff << "time_millis,packVoltage";
+                  std::cout << "time_millis,packVoltage";
                   for (uint16_t i = 0; i < NUM_STRINGS; i++) {
-                    printbuff << ",current" << i;
+                    std::cout << ",current" << i;
                   }
-                  printbuff << ",kW,Whr,soc";
+                  std::cout << ",kW,Whr,soc";
                   //serial->printf(printbuff.str().c_str());
-                  std::cout << printbuff.str();
-                  printbuff.str(std::string());
+                  /*std::cout << printbuff.str();
+                  printbuff.str(std::string());*/
                   for (uint16_t i = 0; i < NUM_CHIPS/2; i++) {
                     for (uint16_t j = 1; j <= NUM_CELLS_PER_CHIP*2; j++) {
-                      printbuff << ",V_" << (char)('A'+i) << j;
+                      std::cout << ",V_" << (char)('A'+i) << j;
                     }
+                    //std::cout << "Length: " << strlen(printbuff.str().c_str()) << "\n";
+                    /*std::cout << printbuff.str();
+                    printbuff.str(std::string());*/
                   }
                   //serial->printf(printbuff.str().c_str());
-                  std::cout << printbuff.str();
-                  printbuff.str(std::string());
+                  //std::cout << printbuff.str();
+                  //printbuff.str(std::string());
                   for (uint16_t i = 0; i < NUM_CHIPS; i++) {
-                    printbuff << ",T_" << (char)('A'+(i/2)) << (i%2)+1;
+                    std::cout << ",T_" << (char)('A'+(i/2)) << (i%2)+1;
                   }
                   for (uint16_t i = 0; i < NUM_CHIPS; i++) {
-                    printbuff << ",dieTemp_" << (char)('A'+(i/2)) << (i%2)+1;
+                    std::cout << ",dieTemp_" << (char)('A'+(i/2)) << (i%2)+1;
                   }
-                  printbuff << ",numBalancing,errCount\n";
+                  std::cout << ",numBalancing,errCount\n";
 
                   //serial->printf(printbuff.str().c_str());
-                  std::cout << printbuff.str();
-                  printbuff.str(std::string());
+                  /*std::cout << printbuff.str();
+                  printbuff.str(std::string());*/
                   //serial2->printf(printbuff.str().c_str());
 
                   // Init display
@@ -138,29 +141,34 @@ class DataThread {
                 break;
               case DATA_DATA:
                 {
+                  //printbuff.str(std::string());
                   float totalCurrent_scaled = ((float)m_data->totalCurrent)/1000.0;
                   //std::cout << "Data thread received full data\n";
                   // Print line of CSV data
-                  printbuff << std::fixed << std::setprecision(1) << m_data->timestamp << ',' << m_data->packVoltage/1000.0 ;
+                  std::cout << std::fixed << std::setprecision(1) << m_data->timestamp << ',' << m_data->packVoltage/1000.0 ;
                   for (uint16_t i = 0; i < NUM_STRINGS; i++) {
-                    printbuff << ',' << ((float)m_data->stringCurrents[i])/1000.0;
+                    std::cout << ',' << ((float)m_data->stringCurrents[i])/1000.0;
                   }
-                  printbuff << ',' << totalCurrent_scaled * m_data->packVoltage / 1000000.0 << ',' << m_data->joules/3600 << ',' << (int)m_data->soc;
-                  for (uint16_t i = 0; i < NUM_CHIPS * NUM_CELLS_PER_CHIP; i++) {
-                    printbuff << ',' << m_data->allVoltages[i];
+                  std::cout << ',' << totalCurrent_scaled * m_data->packVoltage / 1000000.0 << ',' << m_data->joules/3600 << ',' << (int)m_data->soc;
+                  for (uint8_t j = 0; j < NUM_STRINGS; j++) {
+                    for (uint16_t i = 0; i < NUM_CHIPS / NUM_STRINGS * NUM_CELLS_PER_CHIP; i++) {
+                      std::cout << ',' << m_data->allVoltages[j][i];
+                    }
+                    //std::cout << printbuff.str();
+                  }
+                  for (uint16_t i = 0; i < NUM_CHIPS; i++) { 
+                    std::cout << ',' << m_data->allTemperatures[i];
                   }
                   for (uint16_t i = 0; i < NUM_CHIPS; i++) {
-                    printbuff << ',' << m_data->allTemperatures[i];
+                    std::cout << ',' << (int)m_data->dieTemps[i]; 
+                    //std::cout << "chiptemp\n";
                   }
-                  for (uint16_t i = 0; i < NUM_CHIPS; i++) {
-                    printbuff << ',' << (int)m_data->dieTemps[i];
-                  }
-                  printbuff << ',' << (int)m_data->numBalancing;
-                  printbuff << ',' << (int)errCount;
-                  printbuff << '\n';
+                  std::cout << ',' << (int)m_data->numBalancing;
+                  std::cout << ',' << (int)errCount;
+                  std::cout << '\n';
                   //uint32_t curtime = t.read_us();
                   //serial->printf(printbuff.str().c_str());
-                  std::cout << printbuff.str();
+                  //std::cout << printbuff.str();
                   //std::cout << "Print time: " << (t.read_us() - curtime) << "us \n";
                   //serial2->printf(printbuff.str().c_str());
                 }
@@ -192,12 +200,13 @@ class DataThread {
 
                   printbuff.setf(ios::fixed,ios::floatfield);
 
+                  printbuff.str(std::string());
+
                   printbuff << setw(3) << m_summary->totalCurrent/1000 << "A " << setw(3) << m_summary->totalVoltage/1000 << "V" 
                   << setw(6) << setprecision(1) << std::showpoint << std::right << kwh << "kWhr"
                   << "\r-:" << setw(3) << m_summary->minVoltage/10 << " +:" << setw(3) << m_summary->maxVoltage/10
-                  << " A:" << setw(3) << m_summary->totalVoltage/(NUM_CELLS_PER_CHIP*NUM_CHIPS)/10
-                  /*<< "\r " << (char)('A'+(m_summary->maxVoltage_cell/28)) << setw(2) << (m_summary->maxVoltage_cell%28)+1
-                  << " " << (char)('A'+(m_summary->maxVoltage_cell/28)) << setw(2) << (m_summary->maxVoltage_cell%28)+1*/
+                  << " A:" << setw(3) << m_summary->totalVoltage/(NUM_CELLS_PER_CHIP*NUM_CHIPS/NUM_STRINGS)/10
+
                   << "\r+: " << setw(2) << (int)round(m_summary->maxTemp) << " " << (char)('A'+(m_summary->maxTemp_box/2)) << (m_summary->maxTemp_box%2)+1
                   << " -: " << setw(2) << (int)round(m_summary->minTemp) << " " << (char)('A'+(m_summary->minTemp_box/2)) << (m_summary->minTemp_box%2)+1 << " ";
 
@@ -238,7 +247,11 @@ class DataThread {
                   }*/
                   //uint32_t curtime = t.read_us();
                   displayserial->write(dispprint, 22);
+                  /*std::cout << "Display len: " << strlen(printbuff.str().c_str()) << "\n";
+                  std::cout << "Display: " << printbuff.str().c_str() << "\n";*/
+
                   displayserial->write(printbuff.str().c_str(), strlen(printbuff.str().c_str()));
+
                   //std::cout << "Print time: " << (t.read_us() - curtime) << "us \n";
                   //displayserial->printf(printbuff.str().c_str());
 

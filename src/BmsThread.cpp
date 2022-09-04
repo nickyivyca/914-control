@@ -109,7 +109,7 @@ void BMSThread::threadWorker() {
     uint8_t minTemp_box = 255;
     float maxTemp = std::numeric_limits<float>::min();
     uint8_t maxTemp_box = 255;
-    unsigned int totalVoltage[NUM_STRINGS];
+    unsigned int totalVoltage[NUM_STRINGS] = {0};
     //stringCurrents[NUM_STRINGS] = 0;
     m_batterydata->numBalancing = 0;
 
@@ -237,11 +237,13 @@ void BMSThread::threadWorker() {
                 }
               }
               // adjust for 15mV offset due to current sensor
-              if (((BMS_ISENSE_MAP[string]%2 && chip_loc == BMS_ISENSE_MAP[string]+1) ||
-                (!BMS_ISENSE_MAP[string]%2 && chip_loc == BMS_ISENSE_MAP[string]-1)) && index == 13) {
+              if (((BMS_ISENSE_MAP[string]%2 && chip_loc == BMS_ISENSE_MAP[string]-1) ||
+                (!BMS_ISENSE_MAP[string]%2 && chip_loc == BMS_ISENSE_MAP[string]+1)) && index == 13) { 
+                //std::cout << "Subtracting 15mv for current sense on chip " << (int)chip_loc << " string: " << (int)string << " i: " << (int)i << "\n";
                 voltage -= 15;
               }
               if (chip_loc == BMS_ISENSE_MAP[string] && index == 0) {
+                //std::cout << "Adding 15mv for current sense on chip " << (int)chip_loc << " string: " << (int)string << " i: " << (int)i << "\n";
                 voltage += 15;
               }
               m_batterydata->allVoltages[string][(NUM_CELLS_PER_CHIP * i) + index] = voltage;
@@ -303,28 +305,29 @@ void BMSThread::threadWorker() {
           //serial->printf("\n");
           // Calculate current sensor
           if (chip_loc == BMS_ISENSE_MAP[string]) {
+            //std::cout << "On current sense chip i: " << (int)i << " chiploc: " << (int)chip_loc << "\n";
             if (!currentZeroed[string]) {
-              currentZero[string] = gpio_adc[i][0] - gpio_adc[i][1];
+              currentZero[string] = gpio_adc[chip_loc][0] - gpio_adc[chip_loc][1];
               //std::cout << "CurrentZero: " << currentZero << '\n';
               currentZeroed[string] = true;
             }
             // replace 2.497 with zero'd value from startup? maybe use ref
             m_batterydata->stringCurrents[string] = BMS_ISENSE_DIR[string]*
-              (BMS_ISENSE_RANGE[string] * (gpio_adc[i][0] - gpio_adc[i][1] - currentZero[string])/10 / 0.625); // unit mA
+              (BMS_ISENSE_RANGE[string] * (gpio_adc[chip_loc][0] - gpio_adc[chip_loc][1] - currentZero[string])/10 / 0.625); // unit mA
             m_batterydata->totalCurrent += m_batterydata->stringCurrents[string];
-            //std::cout << "Current: " << current << '\n';
+            //std::cout << "Current: " << m_batterydata->stringCurrents[string] << '\n';
           }
 
           // Calculate thermistors: present on even chips (lower chip of each box)
           if (!(i % 2)) {
             for (uint8_t j = 0; j < 2; j++) {
               // calculate resistance from voltage
-              float thermvolt = gpio_adc[i][j]/10000.0;
+              float thermvolt = gpio_adc[chip_loc][j]/10000.0;
               float resistance;
               if (chip_loc == 6 || chip_loc == 7 || chip_loc == 8 || chip_loc == 9) {
-                resistance = (10000.0 * thermvolt)/(5.0 - thermvolt);
-              } else {
                 resistance = (4700.0 * thermvolt)/(5.0 - thermvolt);
+              } else {
+                resistance = (10000.0 * thermvolt)/(5.0 - thermvolt);
               }
               //std::cout << "Calculated resistance " << j+1 << ":  " << resistance << "\n";
 
@@ -340,8 +343,8 @@ void BMSThread::threadWorker() {
 
 
               if (!isnan(steinhart)) {
-                m_batterydata->allTemperatures[i+j] = steinhart;
-                //std::cout << "NTC " << j+1 << ": " << steinhart << '\n';
+                m_batterydata->allTemperatures[(string*NUM_CHIPS/NUM_STRINGS) + i+j] = steinhart;
+                //std::cout << "NTC " << j+1 << " " << (string*NUM_CHIPS/NUM_STRINGS) + i+j << ": " << steinhart << " " << chip_loc << '\n';
                 if (steinhart < minTemp && steinhart != 0){
                   minTemp = steinhart;
                   minTemp_box = j + i;
@@ -404,6 +407,7 @@ void BMSThread::threadWorker() {
       
       *led3 = 0;
       for (uint8_t i = 0; i < NUM_STRINGS; i++) {
+        //std::cout << "Adding " << totalVoltage[i] << " " << totalVoltage[i]/28 << "\n";
         packVoltage += totalVoltage[i];
       }
       packVoltage /= NUM_STRINGS;
@@ -412,7 +416,9 @@ void BMSThread::threadWorker() {
 
       // check difference between strings
       for (uint8_t i = 0; i < NUM_STRINGS; i++) {
+        //std::cout << "Stringcheck: " << (int)totalVoltage[i] - (int)packVoltage << "\n";
         if (abs((int)totalVoltage[i] - (int)packVoltage) > BMS_STRING_DIFFERENCE_THRESHOLD) {
+          //std::cout << "String check failed " << packVoltage << " " << totalVoltage[0] << "\n";
           stringcheckOK = false;
           *led3 = 1;      
           ioexp_bits |= (1 << MCP_PIN_EGR);
@@ -421,15 +427,15 @@ void BMSThread::threadWorker() {
       }
     
 
-      //float totalVoltage_scaled = ((float)totalVoltage)/1000.0;
-      //float totalCurrent_scaled = ((float)m_batterydata->totalCurrent)/1000.0;
+      /*float totalVoltage_scaled = ((float)packVoltage)/1000.0;
+      float totalCurrent_scaled = ((float)m_batterydata->totalCurrent)/1000.0;
 
-      /*std::cout << "Pack Voltage: " << ceil(totalVoltage_scaled * 10.0) / 10.0 << "V"  // round to 1 decimal place
+      std::cout << "Pack Voltage: " << ceil(totalVoltage_scaled * 10.0) / 10.0 << "V"  // round to 1 decimal place
       << " Current: " << totalCurrent_scaled << "A"
       << "\nPower: " << ceil(totalCurrent_scaled * (totalVoltage_scaled * 10.0) / 1000.0) / 10.0 << "kW"  // round to 1 decimal place, scale to kW
       << "\nMax Cell: " << maxVoltage << " " << (char)('A'+(maxVoltage_cell/28)) << (maxVoltage_cell%28)+1
       << " Min Cell: " << minVoltage << " " << (char)('A'+(minVoltage_cell/28)) << (minVoltage_cell%28)+1
-      << " Avg Cell: " << (totalVoltage_scaled/(NUM_CELLS_PER_CHIP*NUM_CHIPS))
+      << " Avg Cell: " << (totalVoltage_scaled/(NUM_CELLS_PER_CHIP*NUM_CHIPS/NUM_STRINGS))
       << "\nMax Temp: " << maxTemp << " " << (char)('A'+(maxTemp_box/2)) << (maxTemp_box%2)+1
       << " Min Temp: " << minTemp << " " << (char)('A'+(minTemp_box/2)) << (minTemp_box%2)+1;
       std::cout << '\n';
@@ -465,7 +471,7 @@ void BMSThread::threadWorker() {
 
 
 
-      if (!startedUp && voltagecheckOK) {
+      if (!startedUp && voltagecheckOK && stringcheckOK) {
         *DO_BattContactor = 1;
         startedUp = true;
         *led1 = 1;
@@ -484,12 +490,12 @@ void BMSThread::threadWorker() {
         *led2 = 0;          
       }
     } else {
-      //std::bitset<8> pecprint(pecStatus);
+      std::bitset<16> pecprint(pecStatus);
 
       mail_t *msg = m_outbox->alloc();
       msg->msg_event = BATT_ERR;
       m_outbox->put(msg);
-      //std::cout << "PEC error! " << pecprint << '\n';
+      std::cout << "PEC error! " << pecprint << '\n';
       *led3 = 1;      
       ioexp_bits |= (1 << MCP_PIN_EGR);
     }
