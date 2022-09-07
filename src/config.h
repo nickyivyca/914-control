@@ -7,20 +7,20 @@
 
 // Number of 6813 chips on isospi bus
 #ifndef NUM_CHIPS
-#define NUM_CHIPS 6
+#define NUM_CHIPS 12
 #endif
 
 // Number of strings of batteries
 #ifndef NUM_STRINGS
-#define NUM_STRINGS 1
+#define NUM_STRINGS 2
 #endif
 
 #ifndef CELL_SENSE_FREQUENCY
-#define CELL_SENSE_FREQUENCY 1
+#define CELL_SENSE_FREQUENCY 10
 #endif
 
 #ifndef CELL_SENSE_FREQUENCY_CHARGE
-#define CELL_SENSE_FREQUENCY_CHARGE 1
+#define CELL_SENSE_FREQUENCY_CHARGE 2
 #endif
 
 #ifndef MAIN_PERIOD
@@ -49,14 +49,15 @@ const int8_t BMS_CELL_MAP[18] = {0, 1, 2, 3, 4, -1, 5, 6, 7, 8, 9, -1, 10, 11, 1
 
 // Which chips constitute each string, in order
 const uint8_t BMS_CHIP_MAP[NUM_STRINGS][NUM_CHIPS/NUM_STRINGS] = {
-		{0, 1, 2, 3, 4, 5}};
+		{0, 1, 2, 3, 4, 5},
+	    {6, 7, 8, 9, 10, 11}};
 
 // Which chip (in the string, not in the mapping) has each string's current sensor
-const uint8_t BMS_ISENSE_MAP[NUM_STRINGS] = {5};
+const uint8_t BMS_ISENSE_MAP[NUM_STRINGS] = {1, 11};
 
-const int8_t BMS_ISENSE_DIR[NUM_STRINGS] = {1};
+const int8_t BMS_ISENSE_DIR[NUM_STRINGS] = {-1, 1};
 
-const float BMS_ISENSE_RANGE[NUM_STRINGS] = {200.0};
+const float BMS_ISENSE_RANGE[NUM_STRINGS] = {50.0, 200.0};
 
 enum thread_message {INIT_ALL, NEW_CELL_DATA, BATT_ERR, BATT_STARTUP, CHARGE_ENABLED, // to main
   BMS_INIT, BMS_READ, ENABLE_BALANCING, DISABLE_BALANCING, // to bms thread
@@ -74,7 +75,7 @@ enum thread_message {INIT_ALL, NEW_CELL_DATA, BATT_ERR, BATT_STARTUP, CHARGE_ENA
 
 // Threshold of difference between average battery string voltage and each string to close contactors
 #ifndef BMS_STRING_DIFFERENCE_THRESHOLD
-#define BMS_STRING_DIFFERENCE_THRESHOLD 250
+#define BMS_STRING_DIFFERENCE_THRESHOLD 750
 #endif
 
 

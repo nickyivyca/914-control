@@ -1,12 +1,12 @@
 {
     "target_overrides": {
         "LPC1768": {
-            "platform.stdio-baud-rate": 230400,
-            "platform.default-serial-baud-rate": 230400,
+            "platform.stdio-baud-rate": 460800,
+            "platform.default-serial-baud-rate": 460800,
             "rtos.main-thread-stack-size": 2048,
             "rtos.thread-stack-size": 2048,
-            "target.printf_lib": "std",
-            "platform.stdio-buffered-serial": 1
+            "target.printf_lib": "minimal-printf",
+            "platform.stdio-buffered-serial": 0
         }
     }
 }

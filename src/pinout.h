@@ -100,7 +100,7 @@
 // Global pointer to serial object
 //
 // This allows for all files to access the serial output
-extern BufferedSerial* serial;
+extern UnbufferedSerial* serial;
 extern BufferedSerial* displayserial;
 
 

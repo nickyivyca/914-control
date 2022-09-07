@@ -112,6 +112,7 @@ void BMSThread::threadWorker() {
     unsigned int totalVoltage[NUM_STRINGS] = {0};
     //stringCurrents[NUM_STRINGS] = 0;
     m_batterydata->numBalancing = 0;
+    m_batterydata->totalCurrent = 0;
 
     uint16_t ioexp_bits = 0;
 
@@ -251,11 +252,11 @@ void BMSThread::threadWorker() {
 
               if (voltage < minVoltage && voltage != 0) {
                 minVoltage = voltage;
-                minVoltage_cell = index + 14*i;
+                minVoltage_cell = index + NUM_CELLS_PER_CHIP*(i + (string * NUM_CHIPS / NUM_STRINGS));
               }
               if (voltage > maxVoltage) {
                 maxVoltage = voltage;
-                maxVoltage_cell = index + 14*i;
+                maxVoltage_cell = index + NUM_CELLS_PER_CHIP*(i + (string * NUM_CHIPS / NUM_STRINGS));
               }
               //totalVoltage += voltage;
               //serial->printf("%dmV ", voltage);
@@ -282,7 +283,7 @@ void BMSThread::threadWorker() {
                 if((voltage > prevMinVoltage) && (voltage - prevMinVoltage > BMS_DISCHARGE_THRESHOLD)) {
                   // Discharge
 
-                  //serial->printf("DISCHARGE CHIP: %d CELL: %d: %dmV (%dmV)\n", i, index, voltage, (voltage - prevMinVoltage));
+                  //printf("DISCHARGE CHIP: %d CELL: %d: %dmV (%dmV)\n", chip_loc, index, voltage, (voltage - prevMinVoltage));
 
                   // Enable discharging
                   conf.dischargeState.value |= (1 << j);
@@ -308,7 +309,7 @@ void BMSThread::threadWorker() {
             //std::cout << "On current sense chip i: " << (int)i << " chiploc: " << (int)chip_loc << "\n";
             if (!currentZeroed[string]) {
               currentZero[string] = gpio_adc[chip_loc][0] - gpio_adc[chip_loc][1];
-              //std::cout << "CurrentZero: " << currentZero << '\n';
+              //std::cout << "CurrentZero string: " << string << " " << currentZero[string] << '\n';
               currentZeroed[string] = true;
             }
             // replace 2.497 with zero'd value from startup? maybe use ref
@@ -347,11 +348,11 @@ void BMSThread::threadWorker() {
                 //std::cout << "NTC " << j+1 << " " << (string*NUM_CHIPS/NUM_STRINGS) + i+j << ": " << steinhart << " " << chip_loc << '\n';
                 if (steinhart < minTemp && steinhart != 0){
                   minTemp = steinhart;
-                  minTemp_box = j + i;
+                  minTemp_box = (string * NUM_CHIPS / NUM_STRINGS) + j + i;
                 }
                 if (steinhart > maxTemp) {
                   maxTemp = steinhart;
-                  maxTemp_box = j + i;
+                  maxTemp_box = (string * NUM_CHIPS / NUM_STRINGS) + j + i;
                 }
                 // max temp check
                 if (steinhart > BMS_TEMPERATURE_THRESHOLD && *DI_ChargeSwitch) {
@@ -386,7 +387,7 @@ void BMSThread::threadWorker() {
           ioexp_bits |= (1 << MCP_PIN_LOWFUEL);
         }
       } else {
-        millicoulombs -= m_batterydata->totalCurrent/m_frequency;
+        millicoulombs -= m_batterydata->totalCurrent/m_frequency/NUM_STRINGS;
         if (millicoulombs < 0) {
           SoC = 0;
         } else {

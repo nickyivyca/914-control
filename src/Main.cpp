@@ -19,7 +19,7 @@
 #include "MCP23017.h"
 
 
-BufferedSerial* serial;
+UnbufferedSerial* serial;
 BufferedSerial* displayserial;
 CAN* canBus;
 
@@ -116,6 +116,7 @@ int main() {
               inbox_data.put(msg_out);
               msg_out = inbox_data.alloc();
               msg_out->msg_event = DATA_SUMMARY;
+              //ThisThread::sleep_for(40);
               inbox_data.put(msg_out);
             }
             break;
@@ -230,10 +231,12 @@ int main() {
 
 void initIO() {
   //serial = new MODSERIAL(USBTX, USBRX, 1024, 32);
-  serial = new BufferedSerial(USBTX, USBRX, 230400);
+  serial = new UnbufferedSerial(USBTX, USBRX, 460800);
+  //serial->set_dma_usage_tx(DMA_USAGE_ALWAYS);
 
   //serial2 = new Serial(PIN_SERIAL2_TX, PIN_SERIAL2_RX, 230400);
   displayserial = new BufferedSerial(PIN_DISPLAY_TX, PIN_DISPLAY_RX, 19200);
+  //displayserial->set_dma_usage_tx(DMA_USAGE_ALWAYS);
 
   //serial->printf("INIT\n");
   
