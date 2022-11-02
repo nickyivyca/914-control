@@ -94,7 +94,7 @@ enum thread_message {INIT_ALL, NEW_CELL_DATA, BATT_ERR, BATT_STARTUP, CHARGE_ENA
 #endif
 
 #ifndef BMS_SOC_RESERVE_THRESHOLD
-#define BMS_SOC_RESERVE_THRESHOLD 18
+#define BMS_SOC_RESERVE_THRESHOLD 16
 #endif
 
 // Threshold when cells will be discharged when discharging is enabled.
@@ -107,6 +107,11 @@ enum thread_message {INIT_ALL, NEW_CELL_DATA, BATT_ERR, BATT_STARTUP, CHARGE_ENA
 // Overtemp threshold
 #ifndef BMS_TEMPERATURE_THRESHOLD
 #define BMS_TEMPERATURE_THRESHOLD 42 // cell datasheet gives charging range up to 45C
+#endif
+
+// 'Heater' threshold
+#ifndef BMS_LOW_TEMPERATURE_THRESHOLD
+#define BMS_LOW_TEMPERATURE_THRESHOLD 20
 #endif
 
 const uint16_t SoC_lookup[102] = {

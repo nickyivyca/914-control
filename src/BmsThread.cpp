@@ -51,6 +51,8 @@ uint16_t gpio_adc[NUM_CHIPS][2];
 
 int32_t currentZero[NUM_STRINGS] = {0};
 bool currentZeroed[NUM_STRINGS] = {false};
+int8_t minTemps[2][NUM_STRINGS] = {BMS_TEMPERATURE_THRESHOLD};
+uint8_t tempSelect = 0;
 bool SoCinitialized = false;
 uint8_t SoC;
 bool startedUp = false;
@@ -204,6 +206,11 @@ void BMSThread::threadWorker() {
     if (!pecStatus) {
     //if (true) {
       m_mutex->lock();
+      for (uint8_t i = 0; i < NUM_STRINGS; i++) {
+        minTemps[tempSelect][i] = BMS_TEMPERATURE_THRESHOLD;
+      }
+      tempSelect = (tempSelect + 1) % 2;
+
       for (uint8_t string = 0; string < NUM_STRINGS; string++) {
         for (unsigned int i = 0; i < NUM_CHIPS/NUM_STRINGS; i++) {
           uint8_t chip_loc = BMS_CHIP_MAP[string][i];
@@ -279,13 +286,20 @@ void BMSThread::threadWorker() {
               // Discharge cells if enabled
 
               LTC6813::Configuration& conf = m_6813bus->m_chips[chip_loc].getConfig();
-              if(*DI_ChargeSwitch && !faultThrown && m_discharging && BALANCE_EN) {
-                if((voltage > prevMinVoltage) && (voltage - prevMinVoltage > BMS_DISCHARGE_THRESHOLD)) {
+              if(!faultThrown && m_discharging && BALANCE_EN) {                
+                if (minTemps[tempSelect][string] < BMS_LOW_TEMPERATURE_THRESHOLD) {
                   // Discharge
 
                   //printf("DISCHARGE CHIP: %d CELL: %d: %dmV (%dmV)\n", chip_loc, index, voltage, (voltage - prevMinVoltage));
 
                   // Enable discharging
+                  conf.dischargeState.value |= (1 << j);
+                  m_batterydata->numBalancing++;
+
+                  // And turn on G light to show low temp
+                  ioexp_bits |= (1 << MCP_PIN_G);
+                } else if((*DI_ChargeSwitch && ((voltage > prevMinVoltage) && (voltage - prevMinVoltage > BMS_DISCHARGE_THRESHOLD)))) {
+                  // else if normal balancing just turn on the balancing resistorz
                   conf.dischargeState.value |= (1 << j);
                   m_batterydata->numBalancing++;
                 } else {
@@ -353,6 +367,9 @@ void BMSThread::threadWorker() {
                 if (steinhart > maxTemp) {
                   maxTemp = steinhart;
                   maxTemp_box = (string * NUM_CHIPS / NUM_STRINGS) + j + i;
+                }
+                if (steinhart < minTemps[(tempSelect+1)%2][string]) {
+                  minTemps[(tempSelect+1)%2][string] = steinhart;
                 }
                 // max temp check
                 if (steinhart > BMS_TEMPERATURE_THRESHOLD && *DI_ChargeSwitch) {
