@@ -6,6 +6,8 @@
             "rtos.main-thread-stack-size": 2048,
             "rtos.thread-stack-size": 2048,
             "target.printf_lib": "minimal-printf",
+            "platform.minimal-printf-enable-floating-point": true,
+            "platform.minimal-printf-set-floating-point-max-decimals": 2,
             "platform.stdio-buffered-serial": 0
         }
     }
