@@ -55,6 +55,7 @@ int8_t minTemps[2][NUM_STRINGS] = {BMS_TEMPERATURE_THRESHOLD};
 uint8_t tempSelect = 0;
 bool SoCinitialized = false;
 uint8_t SoC;
+uint8_t buttonCount = 0;
 bool startedUp = false;
 bool voltagecheckOK = true;
 bool stringcheckOK = true;
@@ -287,7 +288,7 @@ void BMSThread::threadWorker() {
 
               LTC6813::Configuration& conf = m_6813bus->m_chips[chip_loc].getConfig();
               if(!faultThrown && m_discharging && BALANCE_EN) {                
-                if (minTemps[tempSelect][string] < BMS_LOW_TEMPERATURE_THRESHOLD) {
+                if ((minTemps[tempSelect][string] < BMS_LOW_TEMPERATURE_THRESHOLD) && *DI_ChargeSwitch) {
                   // Discharge
 
                   //printf("DISCHARGE CHIP: %d CELL: %d: %dmV (%dmV)\n", chip_loc, index, voltage, (voltage - prevMinVoltage));

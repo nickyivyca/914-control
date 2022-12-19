@@ -138,6 +138,14 @@ extern CAN* canBus;
 #define PIN_PWM_FUELGAUGE p21
 #endif
 
+#ifndef PIN_ANALOG_KNOB1
+#define PIN_ANALOG_KNOB1 p15
+#endif
+
+#ifndef PIN_ANALOG_KNOB2
+#define PIN_ANALOG_KNOB2 p16
+#endif
+
 extern DigitalOut* led1;
 extern DigitalOut* led2;
 extern DigitalOut* led3;
@@ -149,6 +157,8 @@ extern DigitalOut* DO_DriveEnable;
 extern DigitalOut* DO_ChargeEnable;
 
 extern DigitalIn* DI_ChargeSwitch;
+
+extern AnalogIn* knob1;
 
 extern MCP23017* ioexp;
 

@@ -39,6 +39,8 @@ DigitalOut* DO_ChargeEnable;
 
 DigitalIn* DI_ChargeSwitch;
 
+AnalogIn* knob1;
+
 batterycomm_t data_main;
 batterycomm_t data_bms;
 batterycomm_t data_data;
@@ -136,6 +138,8 @@ int main() {
       }
 
     }
+
+    //std::cout << "Analog reading: " << knob1->read_u16() << "\n";
 
     /*fuelgauge->write(fueltest);
     fueltest -= 0.05;
@@ -264,6 +268,8 @@ void initIO() {
   //tach->period_ms(2);
   fuelgauge->write(0.1);
   //tach->write(0.5);
+
+  knob1 = new AnalogIn(PIN_ANALOG_KNOB1);
 
 
   *DO_BattContactor = 0;
