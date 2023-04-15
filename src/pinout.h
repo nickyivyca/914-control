@@ -130,8 +130,8 @@ extern CAN* canBus;
 #define PIN_DI_CHARGESWITCH p17
 #endif
 
-#ifndef PIN_PWM_TACH
-#define PIN_PWM_TACH p22
+#ifndef PIN_DO_TACH
+#define PIN_DO_TACH p22
 #endif
 
 #ifndef PIN_PWM_FUELGAUGE
@@ -151,6 +151,8 @@ extern DigitalOut* led2;
 extern DigitalOut* led3;
 extern DigitalOut* led4;
 
+extern DigitalOut* DO_Tach;
+
 extern DigitalOut* DO_BattContactor;
 extern DigitalOut* DO_BattContactor2;
 extern DigitalOut* DO_DriveEnable;
@@ -163,7 +165,6 @@ extern AnalogIn* knob1;
 extern MCP23017* ioexp;
 
 extern PwmOut* fuelgauge;
-extern PwmOut* tach;
 
 
 #ifndef MCP_PIN_BIT

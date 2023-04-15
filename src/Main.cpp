@@ -26,12 +26,12 @@ CAN* canBus;
 MCP23017* ioexp;
 
 PwmOut* fuelgauge;
-PwmOut* tach;
 
 DigitalOut* led1;
 DigitalOut* led2;
 DigitalOut* led3;
 DigitalOut* led4;
+DigitalOut* DO_Tach;
 DigitalOut* DO_BattContactor;
 DigitalOut* DO_BattContactor2;
 DigitalOut* DO_DriveEnable;
@@ -49,7 +49,14 @@ Mail<mail_t, MSG_QUEUE_SIZE> inbox_main;
 Mail<mail_t, MSG_QUEUE_SIZE> inbox_data;
 Mail<mail_t, MSG_QUEUE_SIZE> inbox_bms;
 
+Ticker tachometer;
+
 void initIO();
+void tach_update();
+void print_cpu_stats();
+
+uint64_t prev_idle_time = 0;
+uint8_t tachcount = 0;
 
 int main() {
   // Init all io pins
@@ -58,9 +65,10 @@ int main() {
   //uint8_t blink = 0;
 
  /*float fueltest = 1;
-  uint32_t tachtest = 4000;
   uint8_t soctest = 0;
   float tachdutytest = 1;*/
+
+  uint32_t tachtest = 1000;
 
   SPI* spiDriver = new SPI(PIN_6820_SPI_MOSI,
                            PIN_6820_SPI_MISO,
@@ -114,7 +122,6 @@ int main() {
 
               mail_t *msg_out = inbox_data.alloc();
               msg_out->msg_event = DATA_DATA;
-              //msg_out->msg_event = DATA_SUMMARY;
               inbox_data.put(msg_out);
               msg_out = inbox_data.alloc();
               msg_out->msg_event = DATA_SUMMARY;
@@ -139,6 +146,7 @@ int main() {
 
     }
 
+
     //std::cout << "Analog reading: " << knob1->read_u16() << "\n";
 
     /*fuelgauge->write(fueltest);
@@ -159,17 +167,22 @@ int main() {
 
     //tach->period_us(15000);
     //tach->pulsewidth_us(3000);
-    /*fuelgauge->write(0.5 + (0.005*soctest));
-    //tach->write(tachdutytest);
-    // tachtest += 100;
-    // if (tachtest > 20000) {
-    //   tachtest = 4000;
-    // }
-    tachdutytest -= 0.005;
-    if (tachdutytest < 0.4) {
-      tachdutytest = 1;
+    //fuelgauge->write(0.5 + (0.005*soctest));
+    /*tachometer.detach();
+    tachometer.attach(&tach_update, std::chrono::microseconds(tachtest/15));
+    //tachometer.attach(&tach_update, 1);
+
+    tachtest += 500;
+    if (tachtest > 30000) {
+      tachtest = 1000;
     }
-    if (soctest < 15) {
+    std::cout << "Tachtest: " << tachtest << "\n";*/
+    // tachdutytest -= 0.005;
+    // if (tachdutytest < 0.4) {
+    //   tachdutytest = 1;
+    // }
+
+    /*if (soctest < 15) {
       ioexp->write_mask(1 << MCP_PIN_LOWFUEL, 0xff);
     } else if (soctest >= 15 && soctest < 30) {      
       ioexp->write_mask(1 << MCP_PIN_G, 0xff);
@@ -229,6 +242,8 @@ int main() {
     /*std::cout << "Charge switch status: " << (int)*DI_ChargeSwitch << "\n";
     *led2 = *DI_ChargeSwitch;*/
 
+    //print_cpu_stats();
+
     ThisThread::sleep_for(MAIN_PERIOD - (t.read_ms()%MAIN_PERIOD));
   }
 }
@@ -249,6 +264,7 @@ void initIO() {
   led2 = new DigitalOut(LED2);
   led3 = new DigitalOut(LED3);
   led4 =  new DigitalOut(LED4);
+  DO_Tach = new DigitalOut(PIN_DO_TACH);
   DO_BattContactor = new DigitalOut(PIN_DO_BATTCONTACTOR);
   DO_BattContactor2 = new DigitalOut(PIN_DO_BATTCONTACTOR2);
   DO_DriveEnable = new DigitalOut(PIN_DO_DRIVEENABLE);
@@ -271,9 +287,38 @@ void initIO() {
 
   knob1 = new AnalogIn(PIN_ANALOG_KNOB1);
 
-
+  *DO_Tach = 0;
   *DO_BattContactor = 0;
   *DO_BattContactor2 = 0;
   *DO_DriveEnable = 0;
   *DO_ChargeEnable = 0;
+}
+
+void tach_update() {
+  tachcount++;
+  if (tachcount == 15) {
+    *DO_Tach = 1;
+    tachcount = 0;
+  } else {
+    *DO_Tach = 0;
+  }
+}
+
+
+void print_cpu_stats()
+{
+    mbed_stats_cpu_t stats;
+    mbed_stats_cpu_get(&stats);
+
+    // Calculate the percentage of CPU usage
+    uint64_t diff_usec = (stats.idle_time - prev_idle_time);
+    uint8_t idle = (diff_usec * 100) / (MAIN_PERIOD*1000);
+    uint8_t usage = 100 - ((diff_usec * 100) / (MAIN_PERIOD*1000));
+    prev_idle_time = stats.idle_time;
+    
+    printf("Time(us): Up: %lld", stats.uptime);
+    printf("   Idle: %lld", stats.idle_time);
+    printf("   Sleep: %lld", stats.sleep_time);
+    printf("   DeepSleep: %lld\n", stats.deep_sleep_time);
+    printf("Idle: %d%% Usage: %d%%\n\n", idle, usage);
 }
