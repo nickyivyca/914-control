@@ -79,6 +79,9 @@ int main() {
   auto ltcBus = LTC681xChainBus<NUM_CHIPS>(spiDriver);
   LTC6813Bus ltc6813Bus = LTC6813Bus(ltcBus);
 
+  Watchdog &watchdog = Watchdog::get_instance();
+  watchdog.start(WATCHDOG_TIMEOUT);
+
   Thread bmsThreadThread;
   BMSThread bmsThread(&inbox_main, &inbox_bms, &ltcBus, &ltc6813Bus, &data_bms);
   bmsThreadThread.start(callback(&BMSThread::startThread, &bmsThread));
@@ -259,7 +262,7 @@ void initIO() {
 
   //serial->printf("INIT\n");
   
-  canBus = new CAN(PIN_CAN_TX, PIN_CAN_RX, CAN_FREQUENCY);
+  canBus = new CAN(PIN_CAN_RX, PIN_CAN_TX, CAN_FREQUENCY);
   led1 = new DigitalOut(LED1);
   led2 = new DigitalOut(LED2);
   led3 = new DigitalOut(LED3);

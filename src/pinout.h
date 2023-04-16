@@ -80,18 +80,18 @@
 
 // CAN TX pin to transceiver
 #ifndef PIN_CAN_TX
-#define PIN_CAN_TX p30
+#define PIN_CAN_TX p29
 #endif
 
 // CAN RX pin from transceiver
 #ifndef PIN_CAN_RX
-#define PIN_CAN_RX p29
+#define PIN_CAN_RX p30
 #endif
 
 // CAN frequency to used
 // default: 500k
 #ifndef CAN_FREQUENCY
-#define CAN_FREQUENCY 250000
+#define CAN_FREQUENCY 500000
 #endif
 
 

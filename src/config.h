@@ -31,6 +31,12 @@
 #define BALANCE_EN 1
 #endif
 
+#ifndef WATCHDOG_TIMEOUT
+#define WATCHDOG_TIMEOUT 2000
+#endif
+
+
+
 // #ifndef TESTBALANCE
 // #define TESTBALANCE
 // #endif

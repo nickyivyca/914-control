@@ -520,6 +520,7 @@ void BMSThread::threadWorker() {
     }
 
     ioexp->write_mask(ioexp_bits, MCP_BMS_THREAD_MASK);
+    Watchdog::get_instance().kick();
 
 
     /*uint16_t mean = (totalVoltage/(NUM_CELLS_PER_CHIP*NUM_CHIPS));
