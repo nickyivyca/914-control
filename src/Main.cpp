@@ -124,9 +124,9 @@ int main() {
               //std::cout << "Copy took " << (t.read_ms() - copystart) << "ms. Telling data thread about it\n";
 
               mail_t *msg_out = inbox_data.alloc();
-              msg_out->msg_event = DATA_DATA;
-              inbox_data.put(msg_out);
-              msg_out = inbox_data.alloc();
+              // msg_out->msg_event = DATA_DATA;
+              // inbox_data.put(msg_out);
+              // msg_out = inbox_data.alloc();
               msg_out->msg_event = DATA_SUMMARY;
               //ThisThread::sleep_for(40);
               inbox_data.put(msg_out);

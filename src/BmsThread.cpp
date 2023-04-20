@@ -204,8 +204,8 @@ void BMSThread::threadWorker() {
     // Now time to crunch numbers
 
 
-    if (!pecStatus) {
-    //if (true) {
+    //if (!pecStatus) {
+    if (true) {
       m_mutex->lock();
       for (uint8_t i = 0; i < NUM_STRINGS; i++) {
         minTemps[tempSelect][i] = BMS_TEMPERATURE_THRESHOLD;

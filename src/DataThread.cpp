@@ -47,17 +47,21 @@ void DataThread::threadWorker() {
               //std::cout << "Data thread received init\n";
 
               // Print CSV header
-              std::cout << "time_millis,packVoltage";
+              //std::cout << "time_millis,packVoltage";
+              printf("time_millis,packVoltage");
               for (uint16_t i = 0; i < NUM_STRINGS; i++) {
-                std::cout << ",current" << i;
+                //std::cout << ",current" << i;
+                printf(",current%d", i);
               }
-              std::cout << ",kW,Whr,soc";
+              //std::cout << ",kW,Whr,soc";
+              printf(",kW,Whr,soc");
               //serial->printf(printbuff.str().c_str());
               /*std::cout << printbuff.str();
               printbuff.str(std::string());*/
               for (uint16_t i = 0; i < NUM_CHIPS/2; i++) {
                 for (uint16_t j = 1; j <= NUM_CELLS_PER_CHIP*2; j++) {
-                  std::cout << ",V_" << (char)('A'+i) << j;
+                  //std::cout << ",V_" << (char)('A'+i) << j;
+                  printf(",V_%c%d", (char)('A'+i), j);
                 }
                 //std::cout << "Length: " << strlen(printbuff.str().c_str()) << "\n";
                 /*std::cout << printbuff.str();
@@ -68,12 +72,19 @@ void DataThread::threadWorker() {
               //std::cout << printbuff.str();
               //printbuff.str(std::string());
               for (uint16_t i = 0; i < NUM_CHIPS; i++) {
-                std::cout << ",T_" << (char)('A'+(i/2)) << (i%2)+1;
+                //std::cout << ",T_" << (char)('A'+(i/2)) << (i%2)+1;
+                printf(",T_%c%d", (char)('A'+(i/2)), (i%2)+1);
               }
               for (uint16_t i = 0; i < NUM_CHIPS; i++) {
-                std::cout << ",dieTemp_" << (char)('A'+(i/2)) << (i%2)+1;
+                //std::cout << ",dieTemp_" << (char)('A'+(i/2)) << (i%2)+1;
+                printf(",dieTemp_%c%d", (char)('A'+(i/2)), (i%2)+1);
               }
-              std::cout << ",numBalancing,errCount\n";
+              //std::cout << ",numBalancing,errCount\n";
+              printf(",numBalancing,errCount\n");
+
+
+              //std::cout << "Init Print time: " << (t.read_us() - curtime) << "us \n";
+              // ~32ms with printf
 
               //serial->printf(printbuff.str().c_str());
               /*std::cout << printbuff.str();
@@ -168,7 +179,7 @@ void DataThread::threadWorker() {
               //uint32_t curtime = t.read_us();
               //std::cout << "Data thread received summary\n";
 
-              std::stringstream printbuff;
+              std::stringstream printbuffstream;
               /*float totalVoltage_scaled = ((float)m_summary->totalVoltage)/1000.0;
               float totalCurrent_scaled = ((float)m_summary->totalCurrent)/1000.0;
 
@@ -189,19 +200,30 @@ void DataThread::threadWorker() {
 
               float kwh = ((float)m_summary->joules)/3600000.0;
 
+
+
               //uint16_t avgcell = 
 
-              printbuff.setf(ios::fixed,ios::floatfield);
+              printbuffstream.setf(ios::fixed,ios::floatfield);
 
               //printbuff.str(std::string());
 
-              printbuff << setw(3) << m_summary->totalCurrent/1000 << "A " << setw(3) << m_summary->totalVoltage/1000 << "V" 
+              printbuffstream << setw(3) << m_summary->totalCurrent/1000 << "A " << setw(3) << m_summary->totalVoltage/1000 << "V" 
               << setw(6) << setprecision(1) << std::showpoint << std::right << kwh << "kWhr"
               << "\r-:" << setw(3) << m_summary->minVoltage/10 << " +:" << setw(3) << m_summary->maxVoltage/10
               << " A:" << setw(3) << m_summary->totalVoltage/(NUM_CELLS_PER_CHIP*NUM_CHIPS/NUM_STRINGS)/10
 
               << "\r+: " << setw(2) << (int)round(m_summary->maxTemp) << " " << (char)('A'+(m_summary->maxTemp_box/2)) << (m_summary->maxTemp_box%2)+1
               << " -: " << setw(2) << (int)round(m_summary->minTemp) << " " << (char)('A'+(m_summary->minTemp_box/2)) << (m_summary->minTemp_box%2)+1 << " ";
+
+              char printbuff[61];
+
+              sprintf(printbuff, "%3dA %3dV%6.1fkWhr\r-:%3d +:%3d A:%3d\r+:%3d %c%d -:%3d %c%d ", m_summary->totalCurrent/1000, m_summary->totalVoltage/1000, kwh, 
+                m_summary->minVoltage/10, m_summary->maxVoltage/10, m_summary->totalVoltage/(NUM_CELLS_PER_CHIP*NUM_CHIPS/NUM_STRINGS)/10,
+                (int)round(m_summary->maxTemp), (char)('A'+(m_summary->maxTemp_box/2)), (m_summary->maxTemp_box%2)+1,
+                (int)round(m_summary->minTemp), (char)('A'+(m_summary->minTemp_box/2)), (m_summary->minTemp_box%2)+1);
+
+
 
               //std::cout.setf(ios::fixed,ios::floatfield);
               //std::cout << std::showpoint << setprecision(1) << setw(6) << kwh << "kWhr \n";
@@ -244,8 +266,8 @@ void DataThread::threadWorker() {
               /*std::cout << "Display len: " << strlen(printbuff.str().c_str()) << "\n";
               std::cout << "Display: " << printbuff.str().c_str() << "\n";*/
               // https://stackoverflow.com/questions/1374468/stringstream-string-and-char-conversion-confusion
-              const std::string& dispbuff = printbuff.str();
-              const char* dispbuff_cstr = dispbuff.c_str();
+              //const std::string& dispbuff = printbuff.str();
+              //const char* dispbuff_cstr = dispbuff.c_str();
               //std::cout << "Display len: " << strlen(dispbuff_cstr) << "\n";
               //std::cout << "Display: " << dispbuff_cstr << "\n";
 
@@ -254,7 +276,8 @@ void DataThread::threadWorker() {
 
               //displayserial->write(printbuff.str().c_str(), strlen(printbuff.str().c_str()));
 
-              displayserial->write(dispbuff_cstr, strlen(dispbuff_cstr));
+              //displayserial->write(dispbuff_cstr, strlen(dispbuff_cstr));
+              displayserial->write(printbuff, strlen(printbuff));
               //serial->write(dispbuff_cstr, strlen(dispbuff_cstr));
               //printbuff.str(std::string());
               //ThisThread::sleep_for(20);
