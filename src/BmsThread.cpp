@@ -439,7 +439,7 @@ void BMSThread::threadWorker() {
         if (abs((int)totalVoltage[i] - (int)packVoltage) > BMS_STRING_DIFFERENCE_THRESHOLD) {
           //std::cout << "String check failed " << packVoltage << " " << totalVoltage[0] << "\n";
           stringcheckOK = false;
-          *led3 = 1;      
+          *led3 = 1;
           ioexp_bits |= (1 << MCP_PIN_EGR);
           break;
         }

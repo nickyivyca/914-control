@@ -146,29 +146,36 @@ void DataThread::threadWorker() {
               float totalCurrent_scaled = ((float)m_data->totalCurrent)/1000.0;
               //std::cout << "Data thread received full data\n";
               // Print line of CSV data
-              std::cout << std::fixed << std::setprecision(1) << m_data->timestamp << ',' << m_data->packVoltage/1000.0 ;
+              //std::cout << std::fixed << std::setprecision(1) << m_data->timestamp << ',' << m_data->packVoltage/1000.0 ;
+              printf("%lu,%d", m_data->timestamp, m_data->packVoltage/1000);
               for (uint16_t i = 0; i < NUM_STRINGS; i++) {
-                std::cout << ',' << ((float)m_data->stringCurrents[i])/1000.0;
+                //std::cout << ',' << ((float)m_data->stringCurrents[i])/1000.0;
+                printf(",%.1f", ((float)m_data->stringCurrents[i])/1000.0);
               }
-              std::cout << ',' << totalCurrent_scaled * m_data->packVoltage / 1000000.0 << ',' << m_data->joules/3600 << ',' << (int)m_data->soc;
+              //std::cout << ',' << totalCurrent_scaled * m_data->packVoltage / 1000000.0 << ',' << m_data->joules/3600 << ',' << (int)m_data->soc;
+              printf(",%.2f,%lld,%d", totalCurrent_scaled * m_data->packVoltage / 1000000.0, m_data->joules/3600, (int)m_data->soc);
               for (uint8_t j = 0; j < NUM_STRINGS; j++) {
                 for (uint16_t i = 0; i < NUM_CHIPS / NUM_STRINGS * NUM_CELLS_PER_CHIP; i++) {
-                  std::cout << ',' << m_data->allVoltages[j][i];
+                  //std::cout << ',' << m_data->allVoltages[j][i];
+                  printf(",%d", m_data->allVoltages[j][i]);
                 }
                 //std::cout << printbuff.str();
 
                 //ThisThread::sleep_for(30);
               }
               for (uint16_t i = 0; i < NUM_CHIPS; i++) { 
-                std::cout << ',' << m_data->allTemperatures[i];
+                //std::cout << ',' << m_data->allTemperatures[i];
+                printf(",%.1f", m_data->allTemperatures[i]);
               }
               for (uint16_t i = 0; i < NUM_CHIPS; i++) {
-                std::cout << ',' << (int)m_data->dieTemps[i]; 
+                //std::cout << ',' << (int)m_data->dieTemps[i]; 
+                printf(",%d", (int)m_data->dieTemps[i]);
                 //std::cout << "chiptemp\n";
               }
-              std::cout << ',' << (int)m_data->numBalancing;
-              std::cout << ',' << (int)errCount;
-              std::cout << '\n';
+              //std::cout << ',' << (int)m_data->numBalancing;
+              //std::cout << ',' << (int)errCount;
+              //std::cout << '\n';
+              printf(",%d,%d\n", (int)m_data->numBalancing, (int)errCount);
               //uint32_t curtime = t.read_us();
 
               //std::cout << "Data Print time: " << (t.read_us() - curtime) << "us \n";
@@ -179,7 +186,7 @@ void DataThread::threadWorker() {
               //uint32_t curtime = t.read_us();
               //std::cout << "Data thread received summary\n";
 
-              std::stringstream printbuffstream;
+              //std::stringstream printbuffstream;
               /*float totalVoltage_scaled = ((float)m_summary->totalVoltage)/1000.0;
               float totalCurrent_scaled = ((float)m_summary->totalCurrent)/1000.0;
 
@@ -204,7 +211,7 @@ void DataThread::threadWorker() {
 
               //uint16_t avgcell = 
 
-              printbuffstream.setf(ios::fixed,ios::floatfield);
+              /*printbuffstream.setf(ios::fixed,ios::floatfield);
 
               //printbuff.str(std::string());
 
@@ -214,13 +221,13 @@ void DataThread::threadWorker() {
               << " A:" << setw(3) << m_summary->totalVoltage/(NUM_CELLS_PER_CHIP*NUM_CHIPS/NUM_STRINGS)/10
 
               << "\r+: " << setw(2) << (int)round(m_summary->maxTemp) << " " << (char)('A'+(m_summary->maxTemp_box/2)) << (m_summary->maxTemp_box%2)+1
-              << " -: " << setw(2) << (int)round(m_summary->minTemp) << " " << (char)('A'+(m_summary->minTemp_box/2)) << (m_summary->minTemp_box%2)+1 << " ";
+              << " -: " << setw(2) << (int)round(m_summary->minTemp) << " " << (char)('A'+(m_summary->minTemp_box/2)) << (m_summary->minTemp_box%2)+1 << " ";*/
 
               char printbuff[61];
 
-              sprintf(printbuff, "%3dA %3dV%6.1fkWhr\r-:%3d +:%3d A:%3d\r+:%3d %c%d -:%3d %c%d ", m_summary->totalCurrent/1000, m_summary->totalVoltage/1000, kwh, 
-                m_summary->minVoltage/10, m_summary->maxVoltage/10, m_summary->totalVoltage/(NUM_CELLS_PER_CHIP*NUM_CHIPS/NUM_STRINGS)/10,
-                (int)round(m_summary->maxTemp), (char)('A'+(m_summary->maxTemp_box/2)), (m_summary->maxTemp_box%2)+1,
+              sprintf(printbuff, "%3dA %3dV%6.1fkWhr\r-:%3d +:%3d A:%3d\r+:%3d %c%d -:%3d %c%d ", (m_summary->totalCurrent/1000)%8192, (m_summary->totalVoltage/1000)%8192,
+               kwh, (m_summary->minVoltage/10)%8192, (m_summary->maxVoltage/10)%8192, (m_summary->totalVoltage/(NUM_CELLS_PER_CHIP*NUM_CHIPS/NUM_STRINGS)/10)%8192,
+                ((int)round(m_summary->maxTemp))%8192, (char)('A'+(m_summary->maxTemp_box/2)), (m_summary->maxTemp_box%2)+1,
                 (int)round(m_summary->minTemp), (char)('A'+(m_summary->minTemp_box/2)), (m_summary->minTemp_box%2)+1);
 
 
