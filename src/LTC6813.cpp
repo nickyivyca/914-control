@@ -7,7 +7,7 @@
 
 #include "config.h"
 #include <bitset>
-#include <iostream>
+//#include <iostream>
 
 #include <DigitalOut.h>
 
@@ -104,10 +104,10 @@ void LTC6813Bus::readConfig() {
   m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadConfigurationGroupA()), 
     rxbuf);
 
-  std::cout << "Reading cfg A: \n";
+  //std::cout << "Reading cfg A: \n";
   for (int i = 0; i < 6; i++) {
     std::bitset<8> c(rxbuf[i]);
-    std::cout << "Byte: " << i << ' ' << c << '\n';
+    //std::cout << "Byte: " << i << ' ' << c << '\n';
     //serial->printf("Byte: %d: 0x%x\r\n", i, data[i]);
   }
 
