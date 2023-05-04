@@ -2,7 +2,7 @@
 #include <initializer_list>
 #include <vector>
 #include <algorithm>
-#include <iostream>
+//#include <iostream>
 #include <bitset>
 
 #include "mbed.h"
@@ -109,9 +109,9 @@ void BMSThread::threadWorker() {
     uint16_t maxVoltage = 0x0000;
     uint8_t maxVoltage_cell = 255;
     float minTemp = std::numeric_limits<float>::max();
-    uint8_t minTemp_box = 255;
+    uint8_t minTemp_box = 50;
     float maxTemp = std::numeric_limits<float>::min();
-    uint8_t maxTemp_box = 255;
+    uint8_t maxTemp_box = 50;
     unsigned int totalVoltage[NUM_STRINGS] = {0};
     //stringCurrents[NUM_STRINGS] = 0;
     m_batterydata->numBalancing = 0;
@@ -318,7 +318,6 @@ void BMSThread::threadWorker() {
             std::bitset<16> balancemap(conf.dischargeState.value);
             std::cout << "Chip " << (int)i << " balance: " << balancemap << '\n';
           }*/
-          //serial->printf("\n");
           // Calculate current sensor
           if (chip_loc == BMS_ISENSE_MAP[string]) {
             //std::cout << "On current sense chip i: " << (int)i << " chiploc: " << (int)chip_loc << "\n";
@@ -514,7 +513,8 @@ void BMSThread::threadWorker() {
       mail_t *msg = m_outbox->alloc();
       msg->msg_event = BATT_ERR;
       m_outbox->put(msg);
-      std::cout << "PEC error! " << pecprint << '\n';
+      //std::cout << "PEC error! " << pecprint << '\n';
+      printf("PEC error! %s\n", pecprint.to_string().c_str());
       *led3 = 1;      
       ioexp_bits |= (1 << MCP_PIN_EGR);
     }

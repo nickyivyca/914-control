@@ -1,7 +1,7 @@
-#include <string>
-#include <iostream>
-#include <sstream>
-#include <iomanip> 
+// #include <string>
+// #include <iostream>
+// #include <sstream>
+// #include <iomanip> 
 
 #include "mbed.h"
 #include "rtos.h"
@@ -225,10 +225,12 @@ void DataThread::threadWorker() {
 
               char printbuff[61];
 
-              sprintf(printbuff, "%3dA %3dV%6.1fkWhr\r-:%3d +:%3d A:%3d\r+:%3d %c%d -:%3d %c%d ", (m_summary->totalCurrent/1000)%8192, (m_summary->totalVoltage/1000)%8192,
-               kwh, (m_summary->minVoltage/10)%8192, (m_summary->maxVoltage/10)%8192, (m_summary->totalVoltage/(NUM_CELLS_PER_CHIP*NUM_CHIPS/NUM_STRINGS)/10)%8192,
-                ((int)round(m_summary->maxTemp))%8192, (char)('A'+(m_summary->maxTemp_box/2)), (m_summary->maxTemp_box%2)+1,
+              sprintf(printbuff, "%c%4dA %3dV%6.1fkWhr\r-:%3d +:%3d A:%3d   \r+:%3d %c%d -:%3d %c%d z", 0x80, m_summary->totalCurrent/1000, m_summary->totalVoltage/1000,
+               kwh, m_summary->minVoltage/10, (m_summary->maxVoltage/10)%512, m_summary->totalVoltage/(NUM_CELLS_PER_CHIP*NUM_CHIPS/NUM_STRINGS)/10,
+                (int)round(m_summary->maxTemp), (char)('A'+(m_summary->maxTemp_box/2)), (m_summary->maxTemp_box%2)+1,
                 (int)round(m_summary->minTemp), (char)('A'+(m_summary->minTemp_box/2)), (m_summary->minTemp_box%2)+1);
+
+              //printf("")
 
 
 
@@ -268,7 +270,7 @@ void DataThread::threadWorker() {
                 displayserial->putc(0);
               }*/
               //uint32_t curtime = t.read_us();
-              displayserial->write(dispprint, 22);
+              //displayserial->write(dispprint, 22);
               //ThisThread::sleep_for(10);
               /*std::cout << "Display len: " << strlen(printbuff.str().c_str()) << "\n";
               std::cout << "Display: " << printbuff.str().c_str() << "\n";*/
@@ -284,7 +286,10 @@ void DataThread::threadWorker() {
               //displayserial->write(printbuff.str().c_str(), strlen(printbuff.str().c_str()));
 
               //displayserial->write(dispbuff_cstr, strlen(dispbuff_cstr));
-              displayserial->write(printbuff, strlen(printbuff));
+              //displayserial->write(printbuff, strlen(printbuff));
+              displayserial->write(printbuff, 1);
+              //displayserial->write(&printbuff[1], 18);
+              displayserial->write(&printbuff[41], 20);
               //serial->write(dispbuff_cstr, strlen(dispbuff_cstr));
               //printbuff.str(std::string());
               //ThisThread::sleep_for(20);
@@ -311,7 +316,8 @@ void DataThread::threadWorker() {
             }
             break;
           default:
-            std::cout << "Invalid message received in Data thread!\n";
+            //std::cout << "Invalid message received in Data thread!\n";
+            printf("Invalid message received in Data thread!\n");
             break;
         }
 

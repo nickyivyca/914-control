@@ -5,7 +5,7 @@
 #include <initializer_list>
 #include <vector>
 #include <algorithm>
-#include <iostream>
+// #include <iostream>
 
 #include "mbed.h"
 #include "rtos.h"
@@ -104,7 +104,8 @@ int main() {
 
         switch(msg->msg_event) {
           case INIT_ALL:
-            std::cout << "Main thread init\n";
+            //std::cout << "Main thread init\n";
+            printf("Main thread init\n");
             break;
           case NEW_CELL_DATA:
             {
@@ -124,9 +125,9 @@ int main() {
               //std::cout << "Copy took " << (t.read_ms() - copystart) << "ms. Telling data thread about it\n";
 
               mail_t *msg_out = inbox_data.alloc();
-              // msg_out->msg_event = DATA_DATA;
-              // inbox_data.put(msg_out);
-              // msg_out = inbox_data.alloc();
+              msg_out->msg_event = DATA_DATA;
+              inbox_data.put(msg_out);
+              msg_out = inbox_data.alloc();
               msg_out->msg_event = DATA_SUMMARY;
               //ThisThread::sleep_for(40);
               inbox_data.put(msg_out);
@@ -140,7 +141,8 @@ int main() {
             }
             break;
           default:
-            std::cout << "Invalid message received in Main thread!\n";
+            //std::cout << "Invalid message received in Main thread!\n";
+            printf("Invalid message received in Main thread!\n");
             break;
         }
         inbox_main.free(msg);
