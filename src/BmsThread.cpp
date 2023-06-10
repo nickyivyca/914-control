@@ -301,6 +301,7 @@ void BMSThread::threadWorker() {
                   ioexp_bits |= (1 << MCP_PIN_G);
                 } else if((*DI_ChargeSwitch && ((voltage > prevMinVoltage) && (voltage - prevMinVoltage > BMS_DISCHARGE_THRESHOLD)))) {
                   // else if normal balancing just turn on the balancing resistorz
+                  //printf("DISCHARGE CHIP: %d CELL: %d: %dmV (%dmV)\n", chip_loc, index, voltage, (voltage - prevMinVoltage));
                   conf.dischargeState.value |= (1 << j);
                   m_batterydata->numBalancing++;
                 } else {
@@ -476,6 +477,7 @@ void BMSThread::threadWorker() {
 
       m_batterydata->soc = SoC;
       m_batterysummary->soc = SoC;
+      m_batterysummary->numBalancing = m_batterydata->numBalancing;
 
       //m_batterydata->totalCurrent = totalCurrent;
       m_batterydata->packVoltage = packVoltage;

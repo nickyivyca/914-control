@@ -117,7 +117,7 @@ enum thread_message {INIT_ALL, NEW_CELL_DATA, BATT_ERR, BATT_STARTUP, CHARGE_ENA
 
 // 'Heater' threshold
 #ifndef BMS_LOW_TEMPERATURE_THRESHOLD
-#define BMS_LOW_TEMPERATURE_THRESHOLD 20
+#define BMS_LOW_TEMPERATURE_THRESHOLD 12
 #endif
 
 const uint16_t SoC_lookup[102] = {

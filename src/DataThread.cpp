@@ -201,38 +201,42 @@ void DataThread::threadWorker() {
               << " A:" << setw(3) << m_summary->totalVoltage/(NUM_CELLS_PER_CHIP*NUM_CHIPS/NUM_STRINGS)/10
 
               << "\r+: " << setw(2) << (int)round(m_summary->maxTemp) << " " << (char)('A'+(m_summary->maxTemp_box/2)) << (m_summary->maxTemp_box%2)+1
-              << " -: " << setw(2) << (int)round(m_summary->minTemp) << " " << (char)('A'+(m_summary->minTemp_box/2)) << (m_summary->minTemp_box%2)+1 << " ";
+              << " -: " << setw(2) << (int)round(m_summary->minTemp) << " " << (char)('A'+(m_summary->minTemp_box/2)) << (m_summary->minTemp_box%2)+1 << "   ";
 
               //std::cout.setf(ios::fixed,ios::floatfield);
               //std::cout << std::showpoint << setprecision(1) << setw(6) << kwh << "kWhr \n";
               //serial2->printf(printbuff.str().c_str());
 
-              uint8_t dispprint[22] = {0x80, // Move to 0,0
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // Block for current bar
+              char dispprint[22] = {0x80, // Move to 0,0
+                ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', // Block for current bar
                 0x94}; // Move to 1,0
 
               //displayserial->putc(0x80); // move to 0,0
 
-              int64_t power = m_summary->totalCurrent*((int64_t)m_summary->totalVoltage)/1000000;
-              // Guards display overflow
-              if (power < 0) {
-                power = 0;
-              }
-              uint8_t fullcount = power/DISP_PER_BOX; //80kw/20 character width;
-              // Limits bar to not go further than it's supposed to
-              if (fullcount > 19) {
-                fullcount = 19;
-              }
-              for (uint8_t i = 0; i < fullcount; i++) {
-                //displayserial->putc(0x5);
-                dispprint[i+1] = 0x5;
-              }
-              // Scale remainder 0-5 for end of the bar
-              uint8_t finalchar = (uint8_t)(((power+DISP_PER_BOX)%DISP_PER_BOX)/(DISP_PER_BOX/5));
-              //displayserial->putc(finalchar);
-              dispprint[fullcount+1] = finalchar;
-              if (errCount == 800) {
-                errCount = 0;
+              if (*DI_ChargeSwitch) {
+                sprintf(&dispprint[1], "%d", m_summary->numBalancing);
+              } else {
+                int64_t power = m_summary->totalCurrent*((int64_t)m_summary->totalVoltage)/1000000;
+                // Guards display overflow
+                if (power < 0) {
+                  power = 0;
+                }
+                uint8_t fullcount = power/DISP_PER_BOX; //80kw/20 character width;
+                // Limits bar to not go further than it's supposed to
+                if (fullcount > 19) {
+                  fullcount = 19;
+                }
+                for (uint8_t i = 0; i < fullcount; i++) {
+                  //displayserial->putc(0x5);
+                  dispprint[i+1] = 0x5;
+                }
+                // Scale remainder 0-5 for end of the bar
+                uint8_t finalchar = (uint8_t)(((power+DISP_PER_BOX)%DISP_PER_BOX)/(DISP_PER_BOX/5));
+                //displayserial->putc(finalchar);
+                dispprint[fullcount+1] = finalchar;
+                if (errCount == 800) {
+                  errCount = 0;
+                }
               }
 
               /*for (uint8_t i = 0; i < (19 - fullcount); i++) {

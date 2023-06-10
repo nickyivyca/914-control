@@ -34,6 +34,7 @@ typedef struct {
   int64_t joules;
   uint32_t timestamp;
   uint8_t soc;
+  uint8_t numBalancing;
 
 } batterysummary_t;
 
