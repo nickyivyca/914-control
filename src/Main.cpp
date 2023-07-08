@@ -18,6 +18,8 @@
 
 #include "MCP23017.h"
 
+#define CAN_RX_INT_FLAG             (1UL << 0)
+
 
 UnbufferedSerial* serial;
 BufferedSerial* displayserial;
@@ -54,9 +56,20 @@ Ticker tachometer;
 void initIO();
 void tach_update();
 void print_cpu_stats();
+void canRX();
+void processCAN();
 
 uint64_t prev_idle_time = 0;
 uint8_t tachcount = 0;
+
+CANMessage canmsg;
+
+CircularBuffer<CANMessage, 32> canqueue;
+
+EventFlags eventFlags;
+//EventQueue CANqueue(4 * EVENTS_EVENT_SIZE);
+
+uint8_t canCount;
 
 int main() {
   // Init all io pins
@@ -68,7 +81,7 @@ int main() {
   uint8_t soctest = 0;
   float tachdutytest = 1;*/
 
-  uint32_t tachtest = 1000;
+  uint32_t tachtest = 60000;
 
   SPI* spiDriver = new SPI(PIN_6820_SPI_MOSI,
                            PIN_6820_SPI_MISO,
@@ -82,10 +95,14 @@ int main() {
   Watchdog &watchdog = Watchdog::get_instance();
   watchdog.start(WATCHDOG_TIMEOUT);
 
+  bool canInitialized = false;
+  canCount = 0;
+
   Thread bmsThreadThread;
   BMSThread bmsThread(&inbox_main, &inbox_bms, &ltcBus, &ltc6813Bus, &data_bms);
   bmsThreadThread.start(callback(&BMSThread::startThread, &bmsThread));
   DataThread dataThread(&inbox_main, &inbox_data, &data_data);
+  Thread CANThread(osPriorityAboveNormal, 512);
 
   osThreadSetPriority(osThreadGetId(), osPriorityHigh7);
   mail_t *msg_init = inbox_data.alloc();
@@ -159,12 +176,11 @@ int main() {
     }*/
 
     // default (0.5?) duty cycle
-    // 10000us = ~3000rpm
-    // 15000us = norpm
-    // 6000us = ~4800rpm
-    // 12500 = ~23-2400rpm
-    // 
 
+    // 5500rpm: 5300us
+    // 4000rpm: 7400
+    // 2000rpm: 15300
+    // 500rpm: ~60000
     //float tachperiod = 1.0/tachtest;
     //tach->period_us(tachtest);
 
@@ -172,18 +188,78 @@ int main() {
     //tach->pulsewidth_us(3000);
     //fuelgauge->write(0.5 + (0.005*soctest));
     /*tachometer.detach();
-    tachometer.attach(&tach_update, std::chrono::microseconds(tachtest/15));
+    tachometer.attach(&tach_update, std::chrono::microseconds(tachtest/2));
     //tachometer.attach(&tach_update, 1);
 
-    tachtest += 500;
-    if (tachtest > 30000) {
-      tachtest = 1000;
+    tachtest -= 500;
+    if (tachtest < 5000) {
+      tachtest = 60000;
     }
     std::cout << "Tachtest: " << tachtest << "\n";*/
     // tachdutytest -= 0.005;
     // if (tachdutytest < 0.4) {
     //   tachdutytest = 1;
     // }
+
+
+
+    //CANMessage msg;
+
+    if (!canInitialized && t.read_ms() > 2000) {
+        //std::cout << "Initializing CAN\n";
+
+      //osStatus threadresult = CANThread.start(callback(processCAN));
+      //printf("Can thread status: %lx\n", threadresult);
+      //std::cout << "Trying to start CAN thread: " << threadresult << "\n";
+      //canBus->attach(CANqueue.event(processCAN));
+      //canBus->filter(1, 0, CANStandard, 0);
+      canBus->attach(canRX);
+
+      //std::cout << "Started CAN stuff\n";
+      //ThisThread::sleep_for(40);
+      //eventFlags.set(CAN_RX_INT_FLAG);
+      canInitialized = true;
+    }
+
+    if (!canqueue.empty()) {
+        CANMessage msg;
+        canqueue.pop(msg);
+        switch(msg.id) {
+          case 1:
+            {
+              //printf("ID: %X %d %d\n", msg.id, msg.data[4], msg.data[5]);
+              static const uint32_t tachScaleBase = 29580000;
+              uint16_t rpm = (msg.data[5] << 8) + msg.data[4];
+              //printf("RPM: %d\n", (msg.data[5] << 8) + msg.data[4]);
+              //printf("volt: %d\n", (msg.data[1] << 8) + msg.data[0]);
+              //printf("Tach vaule: %d ")
+              if (rpm > 0) {
+                tachometer.detach();
+                tachometer.attach(&tach_update, std::chrono::microseconds(tachScaleBase/rpm/2));
+              } else {
+                tachometer.detach();
+              }
+              //printf("Set tach");
+            }
+            break;
+          default:
+            //printf("ID: %d\n", msg.id);
+            break;
+        }
+    }
+    /*if (!canqueue.empty()) {
+        CANMessage msg;
+        canqueue.pop(msg);
+        if (msg.id == 1)
+          printf("ID: %X %d %d\n", msg.id, msg.data[4], msg.data[5]);
+    }*/
+
+
+    /*if (canBus->read(msg)) {
+        printf("Message received: %d\n", msg.data[0]);
+        //led2 = !led2;
+    }*/
+
 
     /*if (soctest < 15) {
       ioexp->write_mask(1 << MCP_PIN_LOWFUEL, 0xff);
@@ -298,12 +374,17 @@ void initIO() {
 }
 
 void tach_update() {
-  tachcount++;
-  if (tachcount == 15) {
-    *DO_Tach = 1;
-    tachcount = 0;
-  } else {
+  // tachcount++;
+  // if (tachcount == 10) {    
+  //   *DO_Tach = 1;
+  //   tachcount = 0;
+  // } else {
+  //   *DO_Tach = 0;
+  //}
+  if (*DO_Tach) {
     *DO_Tach = 0;
+  } else {
+    *DO_Tach = 1;
   }
 }
 
@@ -324,4 +405,19 @@ void print_cpu_stats()
     printf("   Sleep: %lld", stats.sleep_time);
     printf("   DeepSleep: %lld\n", stats.deep_sleep_time);
     printf("Idle: %d%% Usage: %d%%\n\n", idle, usage);
+}
+
+
+
+void canRX() {
+  //canCount++;
+  //std::cout << "cc: " << (int)canCount << "\n";
+  //CANqueue.call(canProcess);
+  //canBus->read(canmsg);
+  CANMessage msg;
+
+  if (canBus->read(msg)) {
+      canqueue.push(msg);
+  }
+  //eventFlags.set(CAN_RX_INT_FLAG);
 }

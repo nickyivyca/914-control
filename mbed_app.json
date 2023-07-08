@@ -4,7 +4,7 @@
             "platform.stdio-baud-rate": 460800,
             "platform.default-serial-baud-rate": 460800,
             "rtos.main-thread-stack-size": 2048,
-            "rtos.thread-stack-size": 2048,
+            "rtos.thread-stack-size": 1280,
             "target.printf_lib": "minimal-printf",
             "platform.minimal-printf-enable-floating-point": true,
             "platform.minimal-printf-set-floating-point-max-decimals": 2,

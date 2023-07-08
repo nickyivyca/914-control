@@ -80,14 +80,9 @@ int CAN::write(CANMessage msg)
 
 int CAN::read(CANMessage &msg, int handle)
 {
-    lock();
+    //lock();
     int ret = can_read(&_can, &msg, handle);
-    unlock();   // re-enable Rx interrupt if there is a handler https://github.com/ARMmbed/mbed-os/issues/6714
-    __disable_irq();
-    if (_irq[(CanIrqType)RxIrq]) {
-      can_irq_set(&_can, (CanIrqType)RxIrq, 1);
-    }
-    __enable_irq();
+    //unlock();
     return ret;
 }
 
@@ -161,9 +156,6 @@ void CAN::attach(Callback<void()> func, IrqType type)
 void CAN::_irq_handler(uintptr_t context, CanIrqType type)
 {
     CAN *handler = reinterpret_cast<CAN *>(context);
-    // disable the interrupt. https://github.com/ARMmbed/mbed-os/issues/6714
-    // To re-enable interrupts other than the Rx, call CAN::attach again.
-    can_irq_set(&handler->_can, type, 0);
     if (handler->_irq[type]) {
         handler->_irq[type].call();
     }
