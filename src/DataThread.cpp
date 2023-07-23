@@ -196,8 +196,8 @@ void DataThread::threadWorker() {
               //printbuff.str(std::string());
 
               printbuff << setw(3) << m_summary->totalCurrent/1000 << "A " << setw(3) << m_summary->totalVoltage/1000 << "V" 
-              << setw(6) << setprecision(1) << std::showpoint << std::right << kwh << "kWhr"
-              << "\r-:" << setw(3) << m_summary->minVoltage/10 << " +:" << setw(3) << m_summary->maxVoltage/10
+              << setw(7) << setprecision(2) << std::showpoint << std::right << kwh << "kWhr" // line is finished so no need for newline char
+              << "-:" << setw(3) << m_summary->minVoltage/10 << " +:" << setw(3) << m_summary->maxVoltage/10
               << " A:" << setw(3) << m_summary->totalVoltage/(NUM_CELLS_PER_CHIP*NUM_CHIPS/NUM_STRINGS)/10
 
               << "\r+: " << setw(2) << (int)round(m_summary->maxTemp) << " " << (char)('A'+(m_summary->maxTemp_box/2)) << (m_summary->maxTemp_box%2)+1
