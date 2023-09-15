@@ -221,7 +221,7 @@ int main() {
       canInitialized = true;
     }
 
-    if (!canqueue.empty()) {
+    while (!canqueue.empty()) {
         CANMessage msg;
         canqueue.pop(msg);
         switch(msg.id) {
