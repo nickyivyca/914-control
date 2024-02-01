@@ -13,7 +13,6 @@
 #include "LTC681xChainBus.h"
 #include "LTC6813.h"
 #include "BmsThread.h"
-#include "DataThread.h"
 #include "Data.h"
 
 #include "MCP23017.h"
@@ -42,10 +41,6 @@ DigitalOut* DO_ChargeEnable;
 DigitalIn* DI_ChargeSwitch;
 
 AnalogIn* knob1;
-
-batterycomm_t data_main;
-batterycomm_t data_bms;
-batterycomm_t data_data;
 
 Mail<mail_t, MSG_QUEUE_SIZE> inbox_main;
 Mail<mail_t, MSG_QUEUE_SIZE> inbox_data;
@@ -99,15 +94,11 @@ int main() {
   canCount = 0;
 
   Thread bmsThreadThread;
-  BMSThread bmsThread(&inbox_main, &inbox_bms, &ltcBus, &ltc6813Bus, &data_bms);
+  BMSThread bmsThread(&inbox_main, &inbox_bms, &ltcBus, &ltc6813Bus);
   bmsThreadThread.start(callback(&BMSThread::startThread, &bmsThread));
-  DataThread dataThread(&inbox_main, &inbox_data, &data_data);
   Thread CANThread(osPriorityAboveNormal, 512);
 
   osThreadSetPriority(osThreadGetId(), osPriorityHigh7);
-  mail_t *msg_init = inbox_data.alloc();
-  msg_init->msg_event = DATA_INIT;
-  inbox_data.put(msg_init);
   Timer t;
   t.start();
   while (1) {
@@ -124,30 +115,6 @@ int main() {
             std::cout << "Main thread init\n";
             break;
           case NEW_CELL_DATA:
-            {
-              //uint32_t copystart = t.read_ms();
-              //std::cout << "New BMS data received\n";
-              data_main.mutex.lock();
-              data_bms.mutex.lock();
-              memcpy(&data_main.batterysummary, &data_bms.batterysummary, sizeof(data_main.batterysummary));
-              memcpy(&data_main.batterydata, &data_bms.batterydata, sizeof(data_main.batterydata));
-              data_bms.mutex.unlock();
-              data_data.mutex.lock();
-              memcpy(&data_data.batterysummary, &data_main.batterysummary, sizeof(data_data.batterysummary));
-              memcpy(&data_data.batterydata, &data_main.batterydata, sizeof(data_data.batterydata));
-              data_data.mutex.unlock();
-
-              data_main.mutex.unlock();
-              //std::cout << "Copy took " << (t.read_ms() - copystart) << "ms. Telling data thread about it\n";
-
-              mail_t *msg_out = inbox_data.alloc();
-              msg_out->msg_event = DATA_DATA;
-              inbox_data.put(msg_out);
-              msg_out = inbox_data.alloc();
-              msg_out->msg_event = DATA_SUMMARY;
-              //ThisThread::sleep_for(40);
-              inbox_data.put(msg_out);
-            }
             break;
           case BATT_ERR:
             {

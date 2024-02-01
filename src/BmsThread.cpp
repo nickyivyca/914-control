@@ -4,6 +4,9 @@
 #include <algorithm>
 #include <iostream>
 #include <bitset>
+#include <string>
+#include <sstream>
+#include <iomanip> 
 
 #include "mbed.h"
 #include "rtos.h"
@@ -16,28 +19,16 @@
 #include "BmsThread.h"
 
 
-
-/*DigitalOut* DO_BattContactor;
-DigitalOut* DO_ChargeEnable;
-
-DigitalOut* led1;
-DigitalOut* led2;
-DigitalOut* led3;
-DigitalOut* led4;
-
-DigitalIn* DI_ChargeSwitch;*/
-
 BMSThread::BMSThread(Mail<mail_t, MSG_QUEUE_SIZE>* outbox, Mail<mail_t, MSG_QUEUE_SIZE>* inbox, 
-  LTC681xBus* bus, LTC6813Bus* bus_6813, batterycomm_t* datacomm) : 
+  LTC681xBus* bus, LTC6813Bus* bus_6813) : 
    m_inbox(inbox), m_outbox(outbox), m_bus(bus), m_6813bus(bus_6813) {
     //m_chip = new LTC6813(*bus);
     //m_6813bus = new LTC6813Bus(*bus);
     /*for (int i = 0; i < NUM_CHIPS; i++) {
       m_chips.push_back(LTC6813(*bus, i));
     }*/
-    m_mutex = &datacomm->mutex;
-    m_batterydata = &datacomm->batterydata;
-    m_batterysummary = &datacomm->batterysummary;
+    // m_batterydata = &datacomm->batterydata;
+    // m_batterysummary = &datacomm->batterysummary;
     //m_bus->wakeupChainSpi();
     //m_6813bus->updateConfig();
 }
@@ -64,10 +55,9 @@ int millicoulombs;
 char canPower[2];
 char* const canPowerSend = canPower;
 
-enum state {INIT, RUN, FAULT};
 
-state currentState = INIT;
-state nextState = INIT;
+batterydata_t m_batterydata;
+batterysummary_t m_batterysummary;
 
 
 void BMSThread::throwBmsFault() {
@@ -98,7 +88,95 @@ void BMSThread::threadWorker() {
   t.start();
 
   uint32_t prevTime = 0;
-  m_batterysummary->joules = 0;
+  m_batterysummary.joules = 0;
+
+  uint8_t printCount = 0;
+  uint16_t errCount = 0;
+
+
+  //uint32_t curtime = t.read_us();
+  //std::cout << "Data thread received init\n";
+
+  // Print CSV header
+  std::cout << "time_millis,packVoltage";
+  for (uint16_t i = 0; i < NUM_STRINGS; i++) {
+    std::cout << ",current" << i;
+  }
+  std::cout << ",kW,Whr,soc";
+  //serial->printf(printbuff.str().c_str());
+  /*std::cout << printbuff.str();
+  printbuff.str(std::string());*/
+  for (uint16_t i = 0; i < NUM_CHIPS/2; i++) {
+    for (uint16_t j = 1; j <= NUM_CELLS_PER_CHIP*2; j++) {
+      std::cout << ",V_" << (char)('A'+i) << j;
+    }
+    //std::cout << "Length: " << strlen(printbuff.str().c_str()) << "\n";
+    /*std::cout << printbuff.str();
+    printbuff.str(std::string());*/
+    //ThisThread::sleep_for(5);
+  }
+  //serial->printf(printbuff.str().c_str());
+  //std::cout << printbuff.str();
+  //printbuff.str(std::string());
+  for (uint16_t i = 0; i < NUM_CHIPS; i++) {
+    std::cout << ",T_" << (char)('A'+(i/2)) << (i%2)+1;
+  }
+  for (uint16_t i = 0; i < NUM_CHIPS; i++) {
+    std::cout << ",dieTemp_" << (char)('A'+(i/2)) << (i%2)+1;
+  }
+  std::cout << ",numBalancing,errCount\n";
+
+  //serial->printf(printbuff.str().c_str());
+  /*std::cout << printbuff.str();
+  printbuff.str(std::string());*/
+  //serial2->printf(printbuff.str().c_str());
+
+  // Init display
+  /*displayserial->putc(0x0C);
+  ThisThread::sleep_for(5);
+  displayserial->putc(0x11); // Backlight on
+  displayserial->putc(0x16); // Cursor off, no blink*/
+
+  uint8_t dispinit[3] = {0x0C, 0x11, 0x16};
+
+  displayserial->write(dispinit, 1);
+  ThisThread::sleep_for(5);
+  displayserial->write(&dispinit[1], 2);
+
+  // add custom characters
+  uint8_t customchar = 0b00010000;
+  //uint8_t charindex = 0xf8;
+  //displayserial->putc(0x94);// move to second row to test characters
+  uint8_t charinit[9] = {0xf8, 0,0,0,0,0,0,0,0};
+  displayserial->write(charinit, 9);
+  //displayserial->putc(charindex);
+  /*for (uint8_t j = 0; j < 8; j++) {
+    displayserial->putc(0);
+  }*/
+  //charindex++;
+  charinit[0]++;
+  for (uint8_t i = 0; i < 5; i++) {
+    //displayserial->putc(charindex);
+    for (uint8_t j = 0; j < 8; j++) {
+      //displayserial->putc(customchar);
+      charinit[j+1] = customchar;
+    }
+    displayserial->write(charinit, 9);
+
+    customchar |= (customchar >> 1);
+    charinit[0]++;
+    //charindex++;
+
+    //std::cout << "sending custom char " << (int)i << '\n';
+    //displayserial->putc((int)i);
+  }
+
+  /*for (uint8_t i = 0; i < 6; i++) {
+    displayserial->putc(i);
+  }*/
+
+  //displayserial->putc(4);
+  //std::cout << "Init Print time: " << (t.read_us() - curtime) << "us \n";
 
 
 
@@ -116,10 +194,12 @@ void BMSThread::threadWorker() {
     uint8_t maxTemp_box = 255;
     unsigned int totalVoltage[NUM_STRINGS] = {0};
     //stringCurrents[NUM_STRINGS] = 0;
-    m_batterydata->numBalancing = 0;
-    m_batterydata->totalCurrent = 0;
+    m_batterydata.numBalancing = 0;
+    m_batterydata.totalCurrent = 0;
 
     uint16_t ioexp_bits = 0;
+
+    uint32_t timestamp = 0;
 
 
     int m_frequency = *DI_ChargeSwitch? CELL_SENSE_FREQUENCY_CHARGE : CELL_SENSE_FREQUENCY;
@@ -178,11 +258,10 @@ void BMSThread::threadWorker() {
     m_6813bus->muteDischarge();
     m_6813bus->updateConfig();
     uint8_t pecStatus = m_6813bus->getCombined(voltages, gpio_adc);
-    m_batterydata->timestamp = t.read_ms();
-    m_batterysummary->timestamp = t.read_ms();
+    timestamp = t.read_ms();
     m_6813bus->unmuteDischarge();
     if (*DI_ChargeSwitch) {
-      m_6813bus->getDieTemps(m_batterydata->dieTemps);
+      m_6813bus->getDieTemps(m_batterydata.dieTemps);
     }
 
 
@@ -208,7 +287,6 @@ void BMSThread::threadWorker() {
 
     if (!pecStatus) {
     //if (true) {
-      m_mutex->lock();
       for (uint8_t i = 0; i < NUM_STRINGS; i++) {
         minTemps[tempSelect][i] = BMS_TEMPERATURE_THRESHOLD;
       }
@@ -257,7 +335,7 @@ void BMSThread::threadWorker() {
                 //std::cout << "Adding 15mv for current sense on chip " << (int)chip_loc << " string: " << (int)string << " i: " << (int)i << "\n";
                 voltage += 15;
               }
-              m_batterydata->allVoltages[string][(NUM_CELLS_PER_CHIP * i) + index] = voltage;
+              m_batterydata.allVoltages[string][(NUM_CELLS_PER_CHIP * i) + index] = voltage;
               totalVoltage[string] += voltage;
 
               if (voltage < minVoltage && voltage != 0) {
@@ -297,7 +375,7 @@ void BMSThread::threadWorker() {
 
                   // Enable discharging
                   conf.dischargeState.value |= (1 << j);
-                  m_batterydata->numBalancing++;
+                  m_batterydata.numBalancing++;
 
                   // And turn on G light to show low temp
                   ioexp_bits |= (1 << MCP_PIN_G);
@@ -305,7 +383,7 @@ void BMSThread::threadWorker() {
                   // else if normal balancing just turn on the balancing resistorz
                   //printf("DISCHARGE CHIP: %d CELL: %d: %dmV (%dmV)\n", chip_loc, index, voltage, (voltage - prevMinVoltage));
                   conf.dischargeState.value |= (1 << j);
-                  m_batterydata->numBalancing++;
+                  m_batterydata.numBalancing++;
                 } else {
                   // Disable discharging
                   conf.dischargeState.value &= ~(1 << j);
@@ -331,10 +409,10 @@ void BMSThread::threadWorker() {
               currentZeroed[string] = true;
             }
             // replace 2.497 with zero'd value from startup? maybe use ref
-            m_batterydata->stringCurrents[string] = BMS_ISENSE_DIR[string]*
+            m_batterydata.stringCurrents[string] = BMS_ISENSE_DIR[string]*
               (BMS_ISENSE_RANGE[string] * (gpio_adc[chip_loc][0] - gpio_adc[chip_loc][1] - currentZero[string])/10 / 0.625); // unit mA
-            m_batterydata->totalCurrent += m_batterydata->stringCurrents[string];
-            //std::cout << "Current: " << m_batterydata->stringCurrents[string] << '\n';
+            m_batterydata.totalCurrent += m_batterydata.stringCurrents[string];
+            //std::cout << "Current: " << m_batterydata.stringCurrents[string] << '\n';
           }
 
           // Calculate thermistors: present on even chips (lower chip of each box)
@@ -362,7 +440,7 @@ void BMSThread::threadWorker() {
 
 
               if (!isnan(steinhart)) {
-                m_batterydata->allTemperatures[(string*NUM_CHIPS/NUM_STRINGS) + i+j] = steinhart;
+                m_batterydata.allTemperatures[(string*NUM_CHIPS/NUM_STRINGS) + i+j] = steinhart;
                 //std::cout << "NTC " << j+1 << " " << (string*NUM_CHIPS/NUM_STRINGS) + i+j << ": " << steinhart << " " << chip_loc << '\n';
                 if (steinhart < minTemp && steinhart != 0){
                   minTemp = steinhart;
@@ -408,7 +486,7 @@ void BMSThread::threadWorker() {
           ioexp_bits |= (1 << MCP_PIN_LOWFUEL);
         }
       } else {
-        millicoulombs -= m_batterydata->totalCurrent/m_frequency/NUM_STRINGS;
+        millicoulombs -= m_batterydata.totalCurrent/m_frequency/NUM_STRINGS;
         if (millicoulombs < 0) {
           SoC = 0;
         } else {
@@ -449,8 +527,9 @@ void BMSThread::threadWorker() {
       }
     
 
-      /*float totalVoltage_scaled = ((float)packVoltage)/1000.0;
-      float totalCurrent_scaled = ((float)m_batterydata->totalCurrent)/1000.0;
+      //float totalVoltage_scaled = ((float)packVoltage)/1000.0;
+      float totalCurrent_scaled = ((float)m_batterydata.totalCurrent)/1000.0;
+      /*
 
       std::cout << "Pack Voltage: " << ceil(totalVoltage_scaled * 10.0) / 10.0 << "V"  // round to 1 decimal place
       << " Current: " << totalCurrent_scaled << "A"
@@ -463,43 +542,41 @@ void BMSThread::threadWorker() {
       std::cout << '\n';
       std::cout << '\n';*/
 
-      m_batterysummary->minVoltage = minVoltage;
-      m_batterysummary->minVoltage_cell = minVoltage_cell;
-      m_batterysummary->maxVoltage = maxVoltage;
-      m_batterysummary->maxVoltage_cell = maxVoltage_cell;
-      m_batterysummary->minTemp = minTemp;
-      m_batterysummary->minTemp_box = minTemp_box;
-      m_batterysummary->maxTemp = maxTemp;
-      m_batterysummary->maxTemp_box = maxTemp_box;
-      m_batterysummary->totalCurrent = m_batterydata->totalCurrent;
-      m_batterysummary->totalVoltage = packVoltage;
+      m_batterysummary.minVoltage = minVoltage;
+      m_batterysummary.minVoltage_cell = minVoltage_cell;
+      m_batterysummary.maxVoltage = maxVoltage;
+      m_batterysummary.maxVoltage_cell = maxVoltage_cell;
+      m_batterysummary.minTemp = minTemp;
+      m_batterysummary.minTemp_box = minTemp_box;
+      m_batterysummary.maxTemp = maxTemp;
+      m_batterysummary.maxTemp_box = maxTemp_box;
+      m_batterysummary.totalCurrent = m_batterydata.totalCurrent;
+      m_batterysummary.totalVoltage = packVoltage;
 
-      m_batterysummary->joules += ((m_batterydata->totalCurrent/1000) * ((int32_t)(packVoltage/1000))/m_frequency);
-      m_batterydata->joules = m_batterysummary->joules;
+      m_batterysummary.joules += ((m_batterydata.totalCurrent/1000) * ((int32_t)(packVoltage/1000))/m_frequency);
+      m_batterydata.joules = m_batterysummary.joules;
 
-      m_batterydata->soc = SoC;
-      m_batterysummary->soc = SoC;
-      m_batterysummary->numBalancing = m_batterydata->numBalancing;
+      m_batterydata.soc = SoC;
+      m_batterysummary.soc = SoC;
+      m_batterysummary.numBalancing = m_batterydata.numBalancing;
 
-      //m_batterydata->totalCurrent = totalCurrent;
-      m_batterydata->packVoltage = packVoltage;
+      //m_batterydata.totalCurrent = totalCurrent;
+      m_batterydata.packVoltage = packVoltage;
 
       prevMinVoltage = minVoltage;
-
-      m_mutex->unlock();
 
       mail_t *msg = m_outbox->alloc();
       msg->msg_event = NEW_CELL_DATA;
       m_outbox->put(msg);
 
-      int16_t canPowerScaled = (((int16_t)(packVoltage/1000)) * (m_batterydata->totalCurrent/1000))/100 + 400;
+      int16_t canPowerScaled = (((int16_t)(packVoltage/1000)) * (m_batterydata.totalCurrent/1000))/100 + 400;
 
       canPower[0] = (255 & canPowerScaled);
       canPower[1] = canPowerScaled >> 8;
 
       //uint16_t interpretedcanpower = (canPower[1] << 8) + canPower[0];
 
-      //printf("CanPower: %d %d %d %d %d %d\n", (packVoltage/1000), (m_batterydata->totalCurrent/1000), canPowerScaled, canPower[1], canPower[0], interpretedcanpower);
+      //printf("CanPower: %d %d %d %d %d %d\n", (packVoltage/1000), (m_batterydata.totalCurrent/1000), canPowerScaled, canPower[1], canPower[0], interpretedcanpower);
 
       canBus->write(CANMessage(2, canPowerSend, 2));
       /*if (!canBus->write(CANMessage(2, canPowerSend, 2))) {
@@ -526,6 +603,162 @@ void BMSThread::threadWorker() {
         *DO_ChargeEnable = 0;
         *led2 = 0;          
       }
+
+
+
+      //printbuff.str(std::string());
+
+      if (printCount++ == CELL_PRINT_MULTIPLE) {
+        // Print line of CSV data
+        std::cout << std::fixed << std::setprecision(1) << timestamp << ',' << m_batterydata.packVoltage/1000.0 ;
+        for (uint16_t i = 0; i < NUM_STRINGS; i++) {
+          std::cout << ',' << ((float)m_batterydata.stringCurrents[i])/1000.0;
+        }
+        std::cout << ',' << totalCurrent_scaled * m_batterydata.packVoltage / 1000000.0 << ',' << m_batterydata.joules/3600 << ',' << (int)m_batterydata.soc;
+        for (uint8_t j = 0; j < NUM_STRINGS; j++) {
+          for (uint16_t i = 0; i < NUM_CHIPS / NUM_STRINGS * NUM_CELLS_PER_CHIP; i++) {
+            std::cout << ',' << m_batterydata.allVoltages[j][i];
+          }
+          //std::cout << printbuff.str();
+
+          //ThisThread::sleep_for(30);
+        }
+        for (uint16_t i = 0; i < NUM_CHIPS; i++) { 
+          std::cout << ',' << m_batterydata.allTemperatures[i];
+        }
+        if (*DI_ChargeSwitch) {
+          for (uint16_t i = 0; i < NUM_CHIPS; i++) {
+            std::cout << ',' << (int)m_batterydata.dieTemps[i]; 
+            //std::cout << "chiptemp\n";
+          }
+        } else {
+          for (uint16_t i = 0; i < NUM_CHIPS; i++) {
+            std::cout << ',';
+            //std::cout << "chiptemp\n";
+          }          
+        }
+        std::cout << ',' << (int)m_batterydata.numBalancing;
+        std::cout << ',' << (int)errCount;
+        std::cout << '\n';
+        //uint32_t curtime = t.read_us();
+
+        //std::cout << "Data Print time: " << (t.read_us() - curtime) << "us \n";     
+
+        printCount = 0;
+      }
+
+
+
+              //uint32_t curtime = t.read_us();
+      //std::cout << "Data thread received summary\n";
+
+      std::stringstream printbuff;
+      /*float totalVoltage_scaled = ((float)m_batterysummary.totalVoltage)/1000.0;
+      float totalCurrent_scaled = ((float)m_batterysummary.totalCurrent)/1000.0;
+
+
+
+      printbuff << std::fixed << std::setprecision(1) << "Pack Voltage: " << totalVoltage_scaled << "V"  // round to 1 decimal place
+      << " Current: " << totalCurrent_scaled << "A"
+      << "\nPower: " << totalCurrent_scaled * (totalVoltage_scaled) / 1000.0 << "kW"  // scale to kW
+      << "\nMax Cell: " << m_batterysummary.maxVoltage << " " << (char)('A'+(m_batterysummary.maxVoltage_cell/28)) << (m_batterysummary.maxVoltage_cell%28)+1
+      << " Min Cell: " << m_batterysummary.minVoltage << " " << (char)('A'+(m_batterysummary.minVoltage_cell/28)) << (m_batterysummary.minVoltage_cell%28)+1
+      << " Avg Cell: " << m_batterysummary.totalVoltage/(NUM_CELLS_PER_CHIP*NUM_CHIPS)
+      << "\nMax Temp: " << m_batterysummary.maxTemp << " " << (char)('A'+(m_batterysummary.maxTemp_box/2)) << (m_batterysummary.maxTemp_box%2)+1
+      << " Min Temp: " << m_batterysummary.minTemp << " " << (char)('A'+(m_batterysummary.minTemp_box/2)) << (m_batterysummary.minTemp_box%2)+1;
+      printbuff << "\n\n";
+      std::cout << printbuff.str();
+      printbuff.str("");*/
+      //uint32_t curtime = t.read_us();
+
+      float kwh = ((float)m_batterysummary.joules)/3600000.0;
+
+      //uint16_t avgcell = 
+
+      printbuff.setf(ios::fixed,ios::floatfield);
+
+      //printbuff.str(std::string());
+
+      printbuff << setw(3) << m_batterysummary.totalCurrent/1000 << "A " << setw(3) << m_batterysummary.totalVoltage/1000 << "V" 
+      << setw(7) << setprecision(2) << std::showpoint << std::right << kwh << "kWhr" // line is finished so no need for newline char
+      << "-:" << setw(3) << m_batterysummary.minVoltage/10 << " +:" << setw(3) << m_batterysummary.maxVoltage/10
+      << " A:" << setw(3) << m_batterysummary.totalVoltage/(NUM_CELLS_PER_CHIP*NUM_CHIPS/NUM_STRINGS)/10
+
+      << "\r+: " << setw(2) << (int)round(m_batterysummary.maxTemp) << " " << (char)('A'+(m_batterysummary.maxTemp_box/2)) << (m_batterysummary.maxTemp_box%2)+1
+      << " -: " << setw(2) << (int)round(m_batterysummary.minTemp) << " " << (char)('A'+(m_batterysummary.minTemp_box/2)) << (m_batterysummary.minTemp_box%2)+1 << "   ";
+
+      //std::cout.setf(ios::fixed,ios::floatfield);
+      //std::cout << std::showpoint << setprecision(1) << setw(6) << kwh << "kWhr \n";
+      //serial2->printf(printbuff.str().c_str());
+
+      char dispprint[22] = {0x80, // Move to 0,0
+        ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', // Block for current bar
+        0x94}; // Move to 1,0
+
+      //displayserial->putc(0x80); // move to 0,0
+
+      if (*DI_ChargeSwitch) {
+        sprintf(&dispprint[1], "%d", m_batterysummary.numBalancing);
+      } else {
+        int64_t power = m_batterysummary.totalCurrent*((int64_t)m_batterysummary.totalVoltage)/1000000;
+        // Guards display overflow
+        if (power < 0) {
+          power = 0;
+        }
+        uint8_t fullcount = power/DISP_PER_BOX; //80kw/20 character width;
+        // Limits bar to not go further than it's supposed to
+        if (fullcount > 19) {
+          fullcount = 19;
+        }
+        for (uint8_t i = 0; i < fullcount; i++) {
+          //displayserial->putc(0x5);
+          dispprint[i+1] = 0x5;
+        }
+        // Scale remainder 0-5 for end of the bar
+        uint8_t finalchar = (uint8_t)(((power+DISP_PER_BOX)%DISP_PER_BOX)/(DISP_PER_BOX/5));
+        //displayserial->putc(finalchar);
+        dispprint[fullcount+1] = finalchar;
+      }
+
+      /*for (uint8_t i = 0; i < (19 - fullcount); i++) {
+        displayserial->putc(0);
+      }*/
+      //uint32_t curtime = t.read_us();
+      displayserial->write(dispprint, 22);
+      //ThisThread::sleep_for(10);
+      /*std::cout << "Display len: " << strlen(printbuff.str().c_str()) << "\n";
+      std::cout << "Display: " << printbuff.str().c_str() << "\n";*/
+      // https://stackoverflow.com/questions/1374468/stringstream-string-and-char-conversion-confusion
+      const std::string& dispbuff = printbuff.str();
+      const char* dispbuff_cstr = dispbuff.c_str();
+      //std::cout << "Display len: " << strlen(dispbuff_cstr) << "\n";
+      //std::cout << "Display: " << dispbuff_cstr << "\n";
+
+
+      //std::cout << "Aout to print to display\n";
+
+      //displayserial->write(printbuff.str().c_str(), strlen(printbuff.str().c_str()));
+
+      displayserial->write(dispbuff_cstr, strlen(dispbuff_cstr));
+      //serial->write(dispbuff_cstr, strlen(dispbuff_cstr));
+      //printbuff.str(std::string());
+      //ThisThread::sleep_for(20);
+
+      //std::cout << "Printed to display\n";
+
+      //std::cout << "Print time: " << (t.read_us() - curtime) << "us \n";
+      //displayserial->printf(printbuff.str().c_str());
+
+
+      //std::cout << "Print time: " << (t.read_us() - curtime) << "us \n";
+
+      //std::cout << "Display Print time: " << (t.read_us() - curtime) << "us \n";
+      //std::cout << m_batterysummary.totalCurrent << "A " << m_batterysummary.totalVoltage/1000 << "V " << "Calc: " << m_batterysummary.totalCurrent*(int32_t)m_batterysummary.totalVoltage/1000000 << " " << power/1000 << "kW fullcount: " << (int)fullcount << " final: " << (int)finalchar << " time: " <<  t.read_ms()-startTime << '\n';
+
+
+
+
+
     } else {
       std::bitset<16> pecprint(pecStatus);
 
@@ -535,101 +768,11 @@ void BMSThread::threadWorker() {
       std::cout << "PEC error! " << pecprint << '\n';
       *led3 = 1;      
       ioexp_bits |= (1 << MCP_PIN_EGR);
+      errCount++;
     }
 
     ioexp->write_mask(ioexp_bits, MCP_BMS_THREAD_MASK);
     Watchdog::get_instance().kick();
-
-
-    /*uint16_t mean = (totalVoltage/(NUM_CELLS_PER_CHIP*NUM_CHIPS));
-    float standardDeviation = 0;
-
-    for(uint8_t i = 0; i < NUM_CELLS_PER_CHIP*NUM_CHIPS; i++) {
-      standardDeviation += pow(allVoltages[i] - mean, 2);
-    }
-
-    std::cout << "CellV Standard deviation: " << sqrt(standardDeviation/(NUM_CELLS_PER_CHIP*NUM_CHIPS)) << '\n';*/
-
-
-
-    /*std::cout << t.read_ms() << ',' << totalCurrent_scaled;
-    for (uint16_t i = 0; i < NUM_CHIPS * NUM_CELLS_PER_CHIP; i++) {
-      std::cout << ',' << allVoltages[i];
-    }
-    for (uint16_t i = 0; i < NUM_CHIPS; i++) {
-      std::cout << ',' << allTemperatures[i];
-    }
-    std::cout << '\n';*/
-
-
-    // Turn off status LED
-    /*conf.gpio4 = LTC6813::GPIOOutputState::kHigh;
-    m_bus->wakeupChainSpi();
-    m_chip->updateConfig();*/
-
-    //serial->printf("Total Voltage: %dmV\n",
-    //         totalVoltage);*/
-    /*serial->printf("Min Voltage: %dmV\n",
-             minVoltage);
-    serial->printf("Max Voltage: %dmV\n",
-             maxVoltage);*/
-    //delete voltages;
-
-    
-    /*for (unsigned int j = 0; j < BMS_BANK_TEMP_COUNT; j++) {
-      auto temp = convertTemp(temperatures[j] / 10);
-      allTemps[(BMS_BANK_TEMP_COUNT * i) + j] = temp;
-
-      temp.map([&](auto t){
-          if (t < minTemp) minTemp = t;
-          if (t > maxTemp) maxTemp = t;
-        });
-    }*/
-    /*
-    allBanksVoltage += totalVoltage;
-
-    averageVoltage = allBanksVoltage / (NUM_CHIPS * NUM_CELLS_PER_CHIP);
-    prevMinVoltage = minVoltage;*/
-
-    /*serial->printf("Temperatures: \n");
-    for(int i = 0; i < BMS_BANK_COUNT * BMS_BANK_CELL_COUNT; i++){
-      allTemps[i].map_or_else([&](auto temp) {
-          if (temp >= BMS_FAULT_TEMP_THRESHOLD_HIGH) {
-            serial->printf("***** BMS HIGH TEMP FAULT *****\nTemp at %d\n\n", temp);
-            throwBmsFault();
-          } else if (temp <= BMS_FAULT_TEMP_THRESHOLD_LOW) {
-            serial->printf("***** BMS LOW TEMP FAULT *****\nTemp at %d\n\n", temp);
-            throwBmsFault();
-          }
-
-          serial->printf("%3d ", temp);
-        },
-        [&]() {
-          serial->printf("ERR ");
-          //serial->printf("***** BMS INVALID TEMP FAULT *****\n");
-          //throwBmsFault();
-        });
-      if((i + 1) % BMS_BANK_CELL_COUNT == 0)
-        serial->printf("\n");
-    }*/
-
-    /*canBus->write(BMSStatMessage(allBanksVoltage / 10, maxVoltage, minVoltage, maxTemp, minTemp));
-    
-    // Send CAN
-    for (size_t i = 0; i < BMS_BANK_COUNT; i++) {
-      // Convert from optional temp values to values with default of -127 (to indicate error)
-      auto temps = std::array<int8_t, BMS_BANK_TEMP_COUNT>();
-      std::transform(allTemps.begin() + (BMS_BANK_TEMP_COUNT * i),
-                     allTemps.begin() + (BMS_BANK_TEMP_COUNT * (i + 1)),
-                     temps.begin(),
-                     [](tl::optional<int8_t> t) { return t.value_or(-127); });
-
-      canBus->write(BMSTempMessage(i, (uint8_t*)temps.data()));
-    }
-
-    for (size_t i = 0; i < 7; i++) {
-      canBus->write(BMSVoltageMessage(i, allVoltages + (4 * i)));
-    }*/
 
     // Compute time elapsed since beginning of measurements and sleep for
     // m_delay accounting for elapsed time

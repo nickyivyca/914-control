@@ -15,12 +15,19 @@
 #define NUM_STRINGS 2
 #endif
 
+// number of times the cells are read per second
 #ifndef CELL_SENSE_FREQUENCY
 #define CELL_SENSE_FREQUENCY 10
 #endif
 
+// number of times the cells are read per second while charging
 #ifndef CELL_SENSE_FREQUENCY_CHARGE
 #define CELL_SENSE_FREQUENCY_CHARGE 2
+#endif
+
+// print cell info every x samples
+#ifndef CELL_PRINT_MULTIPLE
+#define CELL_PRINT_MULTIPLE 5
 #endif
 
 #ifndef MAIN_PERIOD
