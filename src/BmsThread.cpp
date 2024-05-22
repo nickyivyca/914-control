@@ -405,14 +405,15 @@ void BMSThread::threadWorker() {
             //std::cout << "On current sense chip i: " << (int)i << " chiploc: " << (int)chip_loc << "\n";
             if (!currentZeroed[string]) {
               currentZero[string] = gpio_adc[chip_loc][0] - gpio_adc[chip_loc][1];
-              //std::cout << "CurrentZero string: " << string << " " << currentZero[string] << '\n';
+              // std::cout << "CurrentZero string: " << string << " " << currentZero[string] << '\n';
               currentZeroed[string] = true;
             }
             // replace 2.497 with zero'd value from startup? maybe use ref
             m_batterydata.stringCurrents[string] = BMS_ISENSE_DIR[string]*
               (BMS_ISENSE_RANGE[string] * (gpio_adc[chip_loc][0] - gpio_adc[chip_loc][1] - currentZero[string])/10 / 0.625); // unit mA
+              // std::cout << "Raw voltages: " << gpio_adc[chip_loc][0] << " " << gpio_adc[chip_loc][1] << "\n";
             m_batterydata.totalCurrent += m_batterydata.stringCurrents[string];
-            //std::cout << "Current: " << m_batterydata.stringCurrents[string] << '\n';
+            // std::cout << "Current: " << m_batterydata.stringCurrents[string] << '\n';
           }
 
           // Calculate thermistors: present on even chips (lower chip of each box)
@@ -502,7 +503,7 @@ void BMSThread::threadWorker() {
             }
           }
         }
-        //printf("Current of %dmA MC at %u SoC at %u\n", totalCurrent, millicoulombs, SoC);
+        // printf("Current of %dmA MC at %u SoC at %u\n", m_batterydata.totalCurrent, millicoulombs, SoC);
       }
       
       *led3 = 0;
@@ -527,20 +528,20 @@ void BMSThread::threadWorker() {
       }
     
 
-      //float totalVoltage_scaled = ((float)packVoltage)/1000.0;
       float totalCurrent_scaled = ((float)m_batterydata.totalCurrent)/1000.0;
-      /*
+      
 
-      std::cout << "Pack Voltage: " << ceil(totalVoltage_scaled * 10.0) / 10.0 << "V"  // round to 1 decimal place
-      << " Current: " << totalCurrent_scaled << "A"
-      << "\nPower: " << ceil(totalCurrent_scaled * (totalVoltage_scaled * 10.0) / 1000.0) / 10.0 << "kW"  // round to 1 decimal place, scale to kW
-      << "\nMax Cell: " << maxVoltage << " " << (char)('A'+(maxVoltage_cell/28)) << (maxVoltage_cell%28)+1
-      << " Min Cell: " << minVoltage << " " << (char)('A'+(minVoltage_cell/28)) << (minVoltage_cell%28)+1
-      << " Avg Cell: " << (totalVoltage_scaled/(NUM_CELLS_PER_CHIP*NUM_CHIPS/NUM_STRINGS))
-      << "\nMax Temp: " << maxTemp << " " << (char)('A'+(maxTemp_box/2)) << (maxTemp_box%2)+1
-      << " Min Temp: " << minTemp << " " << (char)('A'+(minTemp_box/2)) << (minTemp_box%2)+1;
-      std::cout << '\n';
-      std::cout << '\n';*/
+      // float totalVoltage_scaled = ((float)packVoltage)/1000.0;
+      // std::cout << "Pack Voltage: " << ceil(totalVoltage_scaled * 10.0) / 10.0 << "V"  // round to 1 decimal place
+      // << " Current: " << totalCurrent_scaled << "A"
+      // << "\nPower: " << ceil(totalCurrent_scaled * (totalVoltage_scaled * 10.0) / 1000.0) / 10.0 << "kW"  // round to 1 decimal place, scale to kW
+      // << "\nMax Cell: " << maxVoltage << " " << (char)('A'+(maxVoltage_cell/28)) << (maxVoltage_cell%28)+1
+      // << " Min Cell: " << minVoltage << " " << (char)('A'+(minVoltage_cell/28)) << (minVoltage_cell%28)+1
+      // << " Avg Cell: " << (totalVoltage_scaled/(NUM_CELLS_PER_CHIP*NUM_CHIPS/NUM_STRINGS))
+      // << "\nMax Temp: " << maxTemp << " " << (char)('A'+(maxTemp_box/2)) << (maxTemp_box%2)+1
+      // << " Min Temp: " << minTemp << " " << (char)('A'+(minTemp_box/2)) << (minTemp_box%2)+1;
+      // std::cout << '\n';
+      // std::cout << '\n';
 
       m_batterysummary.minVoltage = minVoltage;
       m_batterysummary.minVoltage_cell = minVoltage_cell;
@@ -606,9 +607,9 @@ void BMSThread::threadWorker() {
 
 
 
-      //printbuff.str(std::string());
+      // printbuff.str(std::string());
 
-      if (printCount++ == CELL_PRINT_MULTIPLE) {
+      if (++printCount == CELL_PRINT_MULTIPLE) {
         // Print line of CSV data
         std::cout << std::fixed << std::setprecision(1) << timestamp << ',' << m_batterydata.packVoltage/1000.0 ;
         for (uint16_t i = 0; i < NUM_STRINGS; i++) {
@@ -635,7 +636,7 @@ void BMSThread::threadWorker() {
           for (uint16_t i = 0; i < NUM_CHIPS; i++) {
             std::cout << ',';
             //std::cout << "chiptemp\n";
-          }          
+          }
         }
         std::cout << ',' << (int)m_batterydata.numBalancing;
         std::cout << ',' << (int)errCount;
@@ -765,7 +766,7 @@ void BMSThread::threadWorker() {
       mail_t *msg = m_outbox->alloc();
       msg->msg_event = BATT_ERR;
       m_outbox->put(msg);
-      std::cout << "PEC error! " << pecprint << '\n';
+      // std::cout << "PEC error! " << pecprint << '\n';
       *led3 = 1;      
       ioexp_bits |= (1 << MCP_PIN_EGR);
       errCount++;

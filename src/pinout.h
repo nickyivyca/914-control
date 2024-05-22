@@ -25,10 +25,6 @@
 #ifndef PIN_SIG_THROTTLE
 #define PIN_SIG_THROTTLE NC
 #endif
-// 'Brake' input
-#ifndef PIN_SIG_BRAKE
-#define PIN_SIG_BRAKE NC
-#endif
 
 
 //
@@ -130,6 +126,16 @@ extern CAN* canBus;
 #define PIN_DI_CHARGESWITCH p17
 #endif
 
+// Brake switch input
+#ifndef PIN_DI_BRAKESWITCH
+#define PIN_DI_BRAKESWITCH p18
+#endif
+
+// Reverse light input
+#ifndef PIN_DI_REVERSESWITCH
+#define PIN_DI_REVERSESWITCH p19
+#endif
+
 #ifndef PIN_DO_TACH
 #define PIN_DO_TACH p22
 #endif
@@ -159,6 +165,8 @@ extern DigitalOut* DO_DriveEnable;
 extern DigitalOut* DO_ChargeEnable;
 
 extern DigitalIn* DI_ChargeSwitch;
+extern DigitalIn* DI_BrakeSwitch;
+extern DigitalIn* DI_ReverseSwitch;
 
 extern AnalogIn* knob1;
 

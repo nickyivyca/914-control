@@ -39,6 +39,8 @@ DigitalOut* DO_DriveEnable;
 DigitalOut* DO_ChargeEnable;
 
 DigitalIn* DI_ChargeSwitch;
+DigitalIn* DI_BrakeSwitch;
+DigitalIn* DI_ReverseSwitch;
 
 AnalogIn* knob1;
 
@@ -214,6 +216,23 @@ int main() {
             break;
         }
     }
+
+    // if (*DI_BrakeSwitch) {
+    //   printf("Brake switch engaged\n");
+    // } else {      
+    //   printf("Brake switch disengaged\n");
+    // }
+
+    // if (*DI_ReverseSwitch) {
+    //   printf("Reverse switch engaged\n");
+    // } else {      
+    //   printf("Reverse switch disengaged\n");
+    // }
+    // if (*DI_ChargeSwitch) {
+    //   printf("Charge switch engaged\n");
+    // } else {      
+    //   printf("Charge switch disengaged\n");
+    // }
     /*if (!canqueue.empty()) {
         CANMessage msg;
         canqueue.pop(msg);
@@ -317,6 +336,8 @@ void initIO() {
   DO_ChargeEnable = new DigitalOut(PIN_DO_CHARGEENABLE);
 
   DI_ChargeSwitch = new DigitalIn(PIN_DI_CHARGESWITCH);
+  DI_BrakeSwitch = new DigitalIn(PIN_DI_BRAKESWITCH);
+  DI_ReverseSwitch = new DigitalIn(PIN_DI_REVERSESWITCH);
 
   ioexp = new MCP23017(PIN_I2C_SDA, PIN_I2C_SCL, MCP_ADDRESS, 1000000);
   ioexp->config(0b1111100000000000, 0b0001100000000000, 0);
