@@ -25,7 +25,7 @@
 #define CELL_SENSE_FREQUENCY_CHARGE 2
 #endif
 
-// print cell info every x samples
+// print cell info every x samples, 0 to disable (until 16 bit overflow)
 #ifndef CELL_PRINT_MULTIPLE
 #define CELL_PRINT_MULTIPLE 5
 #endif
@@ -40,6 +40,11 @@
 
 #ifndef WATCHDOG_TIMEOUT
 #define WATCHDOG_TIMEOUT 2000
+#endif
+
+// Delay in ms before zeroing current sensor and closing contactors
+#ifndef INIT_DELAY
+#define INIT_DELAY 500
 #endif
 
 

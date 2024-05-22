@@ -90,7 +90,7 @@ void BMSThread::threadWorker() {
   uint32_t prevTime = 0;
   m_batterysummary.joules = 0;
 
-  uint8_t printCount = 0;
+  uint16_t printCount = 0;
   uint16_t errCount = 0;
 
 
@@ -314,17 +314,17 @@ void BMSThread::threadWorker() {
 
             int index = BMS_CELL_MAP[j];
             if (index != -1) {
-              if ((chip_loc == 6 || chip_loc == 7 || chip_loc == 8 || chip_loc == 9)) {
-                // add 5mV for top of cellbox and bottom of cellbox
-                if ((i%2 && index == 13) || (!i%2 && index == 0)) {
-                  voltage += 5;
-                }
-                // add 7 mV for top of cellbox for current sense
-                // only works if there are no additional current sensors on the string!
-                if (chip_loc == BMS_ISENSE_MAP[string] && index == 13) {
-                  voltage += 7;
-                }
-              }
+              // if ((chip_loc == 6 || chip_loc == 7 || chip_loc == 8 || chip_loc == 9)) {
+              //   // add 5mV for top of cellbox and bottom of cellbox
+              //   if ((i%2 && index == 13) || (!i%2 && index == 0)) {
+              //     voltage += 5;
+              //   }
+              //   // add 7 mV for top of cellbox for current sense
+              //   // only works if there are no additional current sensors on the string!
+              //   if (chip_loc == BMS_ISENSE_MAP[string] && index == 13) {
+              //     voltage += 7;
+              //   }
+              // }
               // adjust for 15mV offset due to current sensor
               if (((BMS_ISENSE_MAP[string]%2 && chip_loc == BMS_ISENSE_MAP[string]-1) ||
                 (!BMS_ISENSE_MAP[string]%2 && chip_loc == BMS_ISENSE_MAP[string]+1)) && index == 13) { 
@@ -403,9 +403,9 @@ void BMSThread::threadWorker() {
           // Calculate current sensor
           if (chip_loc == BMS_ISENSE_MAP[string]) {
             //std::cout << "On current sense chip i: " << (int)i << " chiploc: " << (int)chip_loc << "\n";
-            if (!currentZeroed[string]) {
+            if (!currentZeroed[string] && t.read_ms() > INIT_DELAY) {
               currentZero[string] = gpio_adc[chip_loc][0] - gpio_adc[chip_loc][1];
-              // std::cout << "CurrentZero string: " << string << " " << currentZero[string] << '\n';
+              // std::cout << "CurrentZero string: " << (int)string << " " << currentZero[string] << '\n';
               currentZeroed[string] = true;
             }
             // replace 2.497 with zero'd value from startup? maybe use ref
@@ -413,7 +413,7 @@ void BMSThread::threadWorker() {
               (BMS_ISENSE_RANGE[string] * (gpio_adc[chip_loc][0] - gpio_adc[chip_loc][1] - currentZero[string])/10 / 0.625); // unit mA
               // std::cout << "Raw voltages: " << gpio_adc[chip_loc][0] << " " << gpio_adc[chip_loc][1] << "\n";
             m_batterydata.totalCurrent += m_batterydata.stringCurrents[string];
-            // std::cout << "Current: " << m_batterydata.stringCurrents[string] << '\n';
+            // std::cout << "Current string: " << (int)string << " " << m_batterydata.stringCurrents[string] << '\n';
           }
 
           // Calculate thermistors: present on even chips (lower chip of each box)
@@ -421,12 +421,12 @@ void BMSThread::threadWorker() {
             for (uint8_t j = 0; j < 2; j++) {
               // calculate resistance from voltage
               float thermvolt = gpio_adc[chip_loc][j]/10000.0;
-              float resistance;
-              if (chip_loc == 6 || chip_loc == 7 || chip_loc == 8 || chip_loc == 9) {
-                resistance = (4700.0 * thermvolt)/(5.0 - thermvolt);
-              } else {
-                resistance = (10000.0 * thermvolt)/(5.0 - thermvolt);
-              }
+              float resistance = (10000.0 * thermvolt)/(5.0 - thermvolt);
+              // if (chip_loc == 6 || chip_loc == 7 || chip_loc == 8 || chip_loc == 9) {
+              //   resistance = (4700.0 * thermvolt)/(5.0 - thermvolt);
+              // } else {
+              //   resistance = (10000.0 * thermvolt)/(5.0 - thermvolt);
+              // }
               //std::cout << "Calculated resistance " << j+1 << ":  " << resistance << "\n";
 
               // https://github.com/panStamp/thermistor/blob/master/thermistor.cpp
@@ -590,6 +590,7 @@ void BMSThread::threadWorker() {
         *DO_BattContactor = 1;
         startedUp = true;
         *led1 = 1;
+        // std::cout << "Starting up\n";
         /**msg = m_outbox->alloc();
         msg->msg_event = BATT_STARTUP;
         m_outbox->put(msg);*/
