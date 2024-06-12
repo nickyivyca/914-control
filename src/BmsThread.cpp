@@ -52,8 +52,12 @@ bool voltagecheckOK = true;
 bool stringcheckOK = true;
 bool faultThrown = false;
 int millicoulombs;
+
 char canPower[2];
 char* const canPowerSend = canPower;
+
+char canIO[1];
+char* const canIOSend = canIO;
 
 
 batterydata_t m_batterydata;
@@ -367,9 +371,9 @@ void BMSThread::threadWorker() {
               // Discharge cells if enabled
 
               LTC6813::Configuration& conf = m_6813bus->m_chips[chip_loc].getConfig();
-              if(!faultThrown && m_discharging && BALANCE_EN) {                
+              if(!faultThrown && m_discharging && BALANCE_EN) {
                 if ((minTemps[tempSelect][string] < BMS_LOW_TEMPERATURE_THRESHOLD) && *DI_ChargeSwitch) {
-                  // Discharge
+                  // Discharge to heat
 
                   //printf("DISCHARGE CHIP: %d CELL: %d: %dmV (%dmV)\n", chip_loc, index, voltage, (voltage - prevMinVoltage));
 
@@ -379,8 +383,8 @@ void BMSThread::threadWorker() {
 
                   // And turn on G light to show low temp
                   ioexp_bits |= (1 << MCP_PIN_G);
-                } else if((*DI_ChargeSwitch && ((voltage > prevMinVoltage) && (voltage - prevMinVoltage > BMS_DISCHARGE_THRESHOLD)))) {
-                  // else if normal balancing just turn on the balancing resistorz
+                } else if (((*DI_ChargeSwitch && (voltage > BMS_BALANCE_VOLTAGE_THRESHOLD)) || !stringcheckOK) && ((voltage > prevMinVoltage) && (voltage - prevMinVoltage > BMS_DISCHARGE_THRESHOLD))) {
+                  // else if normal balancing just turn on the balancing resistor
                   //printf("DISCHARGE CHIP: %d CELL: %d: %dmV (%dmV)\n", chip_loc, index, voltage, (voltage - prevMinVoltage));
                   conf.dischargeState.value |= (1 << j);
                   m_batterydata.numBalancing++;
@@ -584,6 +588,14 @@ void BMSThread::threadWorker() {
         printf("CAN write failed\n");
       }*/
 
+      canIO[0] = 0;
+
+
+      canIO[0] = (*DI_BrakeSwitch << 2) | (*DI_ReverseSwitch << 5);
+
+      canBus->write(CANMessage(200, canIOSend, 1));
+
+      // std::cout << "CANIO: " << (int)canIO[0] << "\n";
 
 
       if (!startedUp && voltagecheckOK && stringcheckOK) {
@@ -674,8 +686,6 @@ void BMSThread::threadWorker() {
       //uint32_t curtime = t.read_us();
 
       float kwh = ((float)m_batterysummary.joules)/3600000.0;
-
-      //uint16_t avgcell = 
 
       printbuff.setf(ios::fixed,ios::floatfield);
 

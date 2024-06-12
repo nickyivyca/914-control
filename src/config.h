@@ -104,6 +104,13 @@ enum thread_message {INIT_ALL, NEW_CELL_DATA, BATT_ERR, BATT_STARTUP, CHARGE_ENA
 #define BMS_FAULT_VOLTAGE_THRESHOLD_HIGH 4180
 #endif
 
+// Cells will only balance above this threshold (unless low temp or strings out of balance)
+//
+// Units: millivolts
+#ifndef BMS_BALANCE_VOLTAGE_THRESHOLD
+#define BMS_BALANCE_VOLTAGE_THRESHOLD 3950
+#endif
+
 // Lower threshold when fault will be thrown for cell voltage
 //
 // Units: millivolts
