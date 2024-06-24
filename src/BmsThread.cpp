@@ -53,8 +53,8 @@ bool stringcheckOK = true;
 bool faultThrown = false;
 int millicoulombs;
 
-char canPower[2];
-char* const canPowerSend = canPower;
+// char canPower[2];
+// char* const canPowerSend = canPower;
 
 char canIO[1];
 char* const canIOSend = canIO;
@@ -570,23 +570,23 @@ void BMSThread::threadWorker() {
 
       prevMinVoltage = minVoltage;
 
-      mail_t *msg = m_outbox->alloc();
-      msg->msg_event = NEW_CELL_DATA;
-      m_outbox->put(msg);
+      // mail_t *msg = m_outbox->alloc();
+      // msg->msg_event = NEW_CELL_DATA;
+      // m_outbox->put(msg);
 
-      int16_t canPowerScaled = (((int16_t)(packVoltage/1000)) * (m_batterydata.totalCurrent/1000))/100 + 400;
+      // int16_t canPowerScaled = (((int16_t)(packVoltage/1000)) * (m_batterydata.totalCurrent/1000))/100 + 400;
 
-      canPower[0] = (255 & canPowerScaled);
-      canPower[1] = canPowerScaled >> 8;
+      // canPower[0] = (255 & canPowerScaled);
+      // canPower[1] = canPowerScaled >> 8;
 
-      //uint16_t interpretedcanpower = (canPower[1] << 8) + canPower[0];
+      // //uint16_t interpretedcanpower = (canPower[1] << 8) + canPower[0];
 
-      //printf("CanPower: %d %d %d %d %d %d\n", (packVoltage/1000), (m_batterydata.totalCurrent/1000), canPowerScaled, canPower[1], canPower[0], interpretedcanpower);
+      // //printf("CanPower: %d %d %d %d %d %d\n", (packVoltage/1000), (m_batterydata.totalCurrent/1000), canPowerScaled, canPower[1], canPower[0], interpretedcanpower);
 
-      canBus->write(CANMessage(2, canPowerSend, 2));
-      /*if (!canBus->write(CANMessage(2, canPowerSend, 2))) {
-        printf("CAN write failed\n");
-      }*/
+      // canBus->write(CANMessage(2, canPowerSend, 2));
+      // /*if (!canBus->write(CANMessage(2, canPowerSend, 2))) {
+      //   printf("CAN write failed\n");
+      // }*/
 
       canIO[0] = 0;
 

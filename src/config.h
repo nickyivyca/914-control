@@ -44,7 +44,7 @@
 
 // Delay in ms before zeroing current sensor and closing contactors
 #ifndef INIT_DELAY
-#define INIT_DELAY 500
+#define INIT_DELAY 750
 #endif
 
 
@@ -101,14 +101,14 @@ enum thread_message {INIT_ALL, NEW_CELL_DATA, BATT_ERR, BATT_STARTUP, CHARGE_ENA
 //
 // Units: millivolts
 #ifndef BMS_FAULT_VOLTAGE_THRESHOLD_HIGH
-#define BMS_FAULT_VOLTAGE_THRESHOLD_HIGH 4180
+#define BMS_FAULT_VOLTAGE_THRESHOLD_HIGH 4190
 #endif
 
 // Cells will only balance above this threshold (unless low temp or strings out of balance)
 //
 // Units: millivolts
 #ifndef BMS_BALANCE_VOLTAGE_THRESHOLD
-#define BMS_BALANCE_VOLTAGE_THRESHOLD 3950
+#define BMS_BALANCE_VOLTAGE_THRESHOLD 3900
 #endif
 
 // Lower threshold when fault will be thrown for cell voltage
