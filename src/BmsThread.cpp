@@ -56,8 +56,13 @@ int millicoulombs;
 // char canPower[2];
 // char* const canPowerSend = canPower;
 
-char canIO[1];
-char* const canIOSend = canIO;
+union bytes {
+    uint8_t bytes[8];
+    uint32_t words[2];
+    uint64_t bits;
+} inverterCAN;
+
+uint8_t* const inverterCANSend = inverterCAN.bytes;
 
 
 batterydata_t m_batterydata;
@@ -96,6 +101,8 @@ void BMSThread::threadWorker() {
 
   uint16_t printCount = 0;
   uint16_t errCount = 0;
+
+  uint8_t canrun = 0;
 
 
   //uint32_t curtime = t.read_us();
@@ -447,7 +454,7 @@ void BMSThread::threadWorker() {
               if (!isnan(steinhart)) {
                 m_batterydata.allTemperatures[(string*NUM_CHIPS/NUM_STRINGS) + i+j] = steinhart;
                 //std::cout << "NTC " << j+1 << " " << (string*NUM_CHIPS/NUM_STRINGS) + i+j << ": " << steinhart << " " << chip_loc << '\n';
-                if (steinhart < minTemp && steinhart != 0){
+                if (steinhart < minTemp && steinhart != 0 && (((string * NUM_CHIPS / NUM_STRINGS) + j + i) != 1)) {
                   minTemp = steinhart;
                   minTemp_box = (string * NUM_CHIPS / NUM_STRINGS) + j + i;
                 }
@@ -455,7 +462,7 @@ void BMSThread::threadWorker() {
                   maxTemp = steinhart;
                   maxTemp_box = (string * NUM_CHIPS / NUM_STRINGS) + j + i;
                 }
-                if (steinhart < minTemps[(tempSelect+1)%2][string]) {
+                if ((steinhart < minTemps[(tempSelect+1)%2][string])  && (((string * NUM_CHIPS / NUM_STRINGS) + j + i) != 1)) {
                   minTemps[(tempSelect+1)%2][string] = steinhart;
                 }
                 // max temp check
@@ -588,14 +595,32 @@ void BMSThread::threadWorker() {
       //   printf("CAN write failed\n");
       // }*/
 
-      canIO[0] = 0;
+      inverterCAN.bits = 0;
 
+      inverterCAN.bits = (*DI_BrakeSwitch << 26) | (*DI_ReverseSwitch << 29) | ((uint64_t)(canrun & 0b11) << 30) | ((uint64_t)(canrun & 0b11) << 46);
 
-      canIO[0] = (*DI_BrakeSwitch << 2) | (*DI_ReverseSwitch << 5);
+      uint32_t crc = 0xffffffff;
+      crc = crc32_word(crc, inverterCAN.words[0]);
+      crc = crc32_word(crc, inverterCAN.words[1]);
 
-      canBus->write(CANMessage(200, canIOSend, 1));
+      inverterCAN.bytes[7] = crc & 0xFF;
 
-      // std::cout << "CANIO: " << (int)canIO[0] << "\n";
+      canBus->write(CANMessage(0x3F, inverterCANSend, 8));
+
+      // std::cout << "CAN bytes: ";
+      // for (int p = 0; p < 8; p++) {
+
+      //   std::bitset<8> px(inverterCANSend[p]);
+
+      //   std::cout << px << " ";
+      // }
+
+      // std::bitset<64> x(inverterCAN.bits);
+      // // std::cout << x << '\n';
+
+      // std::cout << "\nCAN bits: " << x << " " << (int)canrun << " " << (int)(canrun & 0b11) << "\n";
+
+      canrun++;
 
 
       if (!startedUp && voltagecheckOK && stringcheckOK) {
