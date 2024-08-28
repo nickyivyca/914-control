@@ -17,6 +17,8 @@
 
 #include "MCP23017.h"
 
+#include "MovingAverage.h"
+
 #define CAN_RX_INT_FLAG             (1UL << 0)
 
 
@@ -45,8 +47,11 @@ DigitalIn* DI_ReverseSwitch;
 AnalogIn* knob1;
 
 Mail<mail_t, MSG_QUEUE_SIZE> inbox_main;
-Mail<mail_t, MSG_QUEUE_SIZE> inbox_data;
 Mail<mail_t, MSG_QUEUE_SIZE> inbox_bms;
+Mail<chargerdata_t, MSG_QUEUE_SIZE> inbox_bms_charger;
+Mail<inverterdata_t, MSG_QUEUE_SIZE> inbox_bms_inverter;
+
+MovingAverage <int16_t, 16> hstempfilter;
 
 Ticker tachometer;
 
@@ -96,7 +101,7 @@ int main() {
   canCount = 0;
 
   Thread bmsThreadThread;
-  BMSThread bmsThread(&inbox_main, &inbox_bms, &ltcBus, &ltc6813Bus);
+  BMSThread bmsThread(&inbox_main, &inbox_bms_charger, &inbox_bms_inverter, &ltcBus, &ltc6813Bus);
   bmsThreadThread.start(callback(&BMSThread::startThread, &bmsThread));
   Thread CANThread(osPriorityAboveNormal, 512);
 
@@ -136,41 +141,6 @@ int main() {
     }
 
 
-    //std::cout << "Analog reading: " << knob1->read_u16() << "\n";
-
-    /*fuelgauge->write(fueltest);
-    fueltest -= 0.05;
-    if (fueltest < 0.5) {
-      fueltest = 1;
-    }*/
-
-    // default (0.5?) duty cycle
-
-    // 5500rpm: 5300us
-    // 4000rpm: 7400
-    // 2000rpm: 15300
-    // 500rpm: ~60000
-    //float tachperiod = 1.0/tachtest;
-    //tach->period_us(tachtest);
-
-    //tach->period_us(15000);
-    //tach->pulsewidth_us(3000);
-    //fuelgauge->write(0.5 + (0.005*soctest));
-    /*tachometer.detach();
-    tachometer.attach(&tach_update, std::chrono::microseconds(tachtest/2));
-    //tachometer.attach(&tach_update, 1);
-
-    tachtest -= 500;
-    if (tachtest < 5000) {
-      tachtest = 60000;
-    }
-    std::cout << "Tachtest: " << tachtest << "\n";*/
-    // tachdutytest -= 0.005;
-    // if (tachdutytest < 0.4) {
-    //   tachdutytest = 1;
-    // }
-
-
 
     //CANMessage msg;
 
@@ -194,7 +164,8 @@ int main() {
         CANMessage msg;
         canqueue.pop(msg);
         switch(msg.id) {
-          case 1:
+          case 1: 
+            // Inverter data
             {
               //printf("ID: %X %d %d\n", msg.id, msg.data[4], msg.data[5]);
               static const uint32_t tachScaleBase = 29580000;
@@ -208,104 +179,27 @@ int main() {
               } else {
                 tachometer.detach();
               }
-              //printf("Set tach");
+
+              inverterdata_t *msg_out = inbox_bms_inverter.alloc();
+              hstempfilter.add((msg.data[3] << 8) + msg.data[2]);
+              msg_out->heatsinktemp = hstempfilter.get()/10;
+              inbox_bms_inverter.put(msg_out);
             }
             break;
+          case 12345: // placeholder ID
+            {
+              // Charger data
+              chargerdata_t *msg_out = inbox_bms_charger.alloc();
+              msg_out->VAC = 0;
+              msg_out->IAC = 0;
+              inbox_bms_charger.put(msg_out);
+              break;
+            }
           default:
             //printf("ID: %d\n", msg.id);
             break;
         }
-    }
-
-    // if (*DI_BrakeSwitch) {
-    //   printf("Brake switch engaged\n");
-    // } else {      
-    //   printf("Brake switch disengaged\n");
-    // }
-
-    // if (*DI_ReverseSwitch) {
-    //   printf("Reverse switch engaged\n");
-    // } else {      
-    //   printf("Reverse switch disengaged\n");
-    // }
-    // if (*DI_ChargeSwitch) {
-    //   printf("Charge switch engaged\n");
-    // } else {      
-    //   printf("Charge switch disengaged\n");
-    // }
-    /*if (!canqueue.empty()) {
-        CANMessage msg;
-        canqueue.pop(msg);
-        if (msg.id == 1)
-          printf("ID: %X %d %d\n", msg.id, msg.data[4], msg.data[5]);
-    }*/
-
-
-    /*if (canBus->read(msg)) {
-        printf("Message received: %d\n", msg.data[0]);
-        //led2 = !led2;
-    }*/
-
-
-    /*if (soctest < 15) {
-      ioexp->write_mask(1 << MCP_PIN_LOWFUEL, 0xff);
-    } else if (soctest >= 15 && soctest < 30) {      
-      ioexp->write_mask(1 << MCP_PIN_G, 0xff);
-    } else if (soctest >= 30 && soctest < 45) {      
-      ioexp->write_mask(1 << MCP_PIN_BIGB, 0xff);
-    } else if (soctest >= 45 && soctest < 60) {      
-      ioexp->write_mask(1 << MCP_PIN_EGR, 0xff);
-    } else if (soctest >= 60 && soctest < 61) {      
-      ioexp->write_mask(1 << MCP_PIN_BMSERR, 0xff);
-    } else {
-      ioexp->write_mask(0, 0xff);
-    }
-    soctest++;
-    if (soctest > 100) {
-      soctest = 0;
-    }
-    std::cout << "soc: " << (int)soctest << "\n";*/
-
-    /*char i2ctest;
-    const uint8_t addr_iodir = 0x00;
-    i2ctest = ioexp->readRegister(IODIR);
-    std::cout << "Read: " << std::hex << (int)i2ctest << "\n";*/
-
-
-    /*uint32_t readbase = t.read_us();
-    if (ioexp->read_bit(15)) {
-      std::cout << "\nB7 high\n";
-    } else {
-      std::cout << "\nB7 low\n";
-    }
-    if (ioexp->read_bit(14)) {
-      std::cout << "B6 high\n";
-    } else {
-      std::cout << "B6 low\n";
-    }
-    if (ioexp->read_bit(13)) {
-      std::cout << "B5 high\n";
-    } else {
-      std::cout << "B5 low\n";
-    }
-    if (ioexp->read_bit(12)) {
-      std::cout << "B4 high\n";
-    } else {
-      std::cout << "B4 low\n";
-    }
-
-    std::cout << "4x read time: " << (int)(t.read_us() - readbase) << "\n";*/
-
-
-    //std::cout << "Looping main while " << (MAIN_PERIOD - (t.read_ms()%MAIN_PERIOD)) << '\n';
-
-    /*blink++;
-    std::cout << "blink: " << (int)blink << " Output driven\n";
-    *led4 = blink%2;
-    *DO_BattContactor = blink%2;*/
-
-    /*std::cout << "Charge switch status: " << (int)*DI_ChargeSwitch << "\n";
-    *led2 = *DI_ChargeSwitch;*/
+    } 
 
     //print_cpu_stats();
 

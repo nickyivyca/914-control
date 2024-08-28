@@ -19,9 +19,9 @@
 #include "BmsThread.h"
 
 
-BMSThread::BMSThread(Mail<mail_t, MSG_QUEUE_SIZE>* outbox, Mail<mail_t, MSG_QUEUE_SIZE>* inbox, 
-  LTC681xBus* bus, LTC6813Bus* bus_6813) : 
-   m_inbox(inbox), m_outbox(outbox), m_bus(bus), m_6813bus(bus_6813) {
+BMSThread::BMSThread(Mail<mail_t, MSG_QUEUE_SIZE>* inbox_main, Mail<chargerdata_t, MSG_QUEUE_SIZE>* inbox_charger, 
+  Mail<inverterdata_t, MSG_QUEUE_SIZE>* inbox_inverter, LTC681xBus* bus, LTC6813Bus* bus_6813) : 
+   m_inbox_main(inbox_main), m_inbox_charger(inbox_charger), m_inbox_inverter(inbox_inverter), m_bus(bus), m_6813bus(bus_6813) {
     //m_chip = new LTC6813(*bus);
     //m_6813bus = new LTC6813Bus(*bus);
     /*for (int i = 0; i < NUM_CHIPS; i++) {
@@ -68,6 +68,9 @@ uint8_t* const inverterCANSend = inverterCAN.bytes;
 batterydata_t m_batterydata;
 batterysummary_t m_batterysummary;
 
+chargerdata_t m_chargerdata;
+inverterdata_t m_inverterdata;
+
 
 void BMSThread::throwBmsFault() {
   m_discharging = false;
@@ -96,7 +99,7 @@ void BMSThread::threadWorker() {
   Timer t;
   t.start();
 
-  uint32_t prevTime = 0;
+  // uint32_t prevTime = 0;
   m_batterysummary.joules = 0;
 
   uint16_t printCount = 0;
@@ -135,7 +138,7 @@ void BMSThread::threadWorker() {
   for (uint16_t i = 0; i < NUM_CHIPS; i++) {
     std::cout << ",dieTemp_" << (char)('A'+(i/2)) << (i%2)+1;
   }
-  std::cout << ",numBalancing,errCount\n";
+  std::cout << ",hsTemp,numBalancing,errCount\n";
 
   //serial->printf(printbuff.str().c_str());
   /*std::cout << printbuff.str();
@@ -211,6 +214,32 @@ void BMSThread::threadWorker() {
     uint16_t ioexp_bits = 0;
 
     uint32_t timestamp = 0;
+
+    
+    while(!m_inbox_inverter->empty()) {
+      osEvent evt = m_inbox_inverter->get();
+
+      if (evt.status == osEventMail) {
+        //std::cout << "Received some mail\n";
+        inverterdata_t *msg = (inverterdata_t *)evt.value.p;
+        m_inverterdata = *msg;
+        m_inbox_inverter->free(msg);
+      } else {
+        std::cout << "Invalid inverter data received\n";
+      }
+    }
+    while(!m_inbox_charger->empty()) {
+      osEvent evt = m_inbox_charger->get();
+
+      if (evt.status == osEventMail) {
+        //std::cout << "Received some mail\n";
+        chargerdata_t *msg = (chargerdata_t *)evt.value.p;
+        m_chargerdata = *msg;
+        m_inbox_charger->free(msg);
+      } else {
+        std::cout << "Invalid charger data received\n";
+      }
+    }
 
 
     int m_frequency = *DI_ChargeSwitch? CELL_SENSE_FREQUENCY_CHARGE : CELL_SENSE_FREQUENCY;
@@ -597,7 +626,13 @@ void BMSThread::threadWorker() {
 
       inverterCAN.bits = 0;
 
-      inverterCAN.bits = (*DI_BrakeSwitch << 26) | (*DI_ReverseSwitch << 29) | ((uint64_t)(canrun & 0b11) << 30) | ((uint64_t)(canrun & 0b11) << 46);
+      uint8_t bms_bit = 0;
+      if (*DI_ReverseSwitch || !voltagecheckOK) {
+        bms_bit = 1;
+      }
+
+      inverterCAN.bits = (*DI_BrakeSwitch << 26) | (bms_bit << 29) | ((uint64_t)(canrun & 0b11) << 30) | ((uint64_t)(canrun & 0b11) << 46);
+      inverterCAN.bytes[6] = 0xFF; // regen preset
 
       uint32_t crc = 0xffffffff;
       crc = crc32_word(crc, inverterCAN.words[0]);
@@ -676,6 +711,7 @@ void BMSThread::threadWorker() {
             //std::cout << "chiptemp\n";
           }
         }
+        std::cout << ',' << (int)m_inverterdata.heatsinktemp;
         std::cout << ',' << (int)m_batterydata.numBalancing;
         std::cout << ',' << (int)errCount;
         std::cout << '\n';
@@ -721,8 +757,8 @@ void BMSThread::threadWorker() {
       << "-:" << setw(3) << m_batterysummary.minVoltage/10 << " +:" << setw(3) << m_batterysummary.maxVoltage/10
       << " A:" << setw(3) << m_batterysummary.totalVoltage/(NUM_CELLS_PER_CHIP*NUM_CHIPS/NUM_STRINGS)/10
 
-      << "\r+: " << setw(2) << (int)round(m_batterysummary.maxTemp) << " " << (char)('A'+(m_batterysummary.maxTemp_box/2)) << (m_batterysummary.maxTemp_box%2)+1
-      << " -: " << setw(2) << (int)round(m_batterysummary.minTemp) << " " << (char)('A'+(m_batterysummary.minTemp_box/2)) << (m_batterysummary.minTemp_box%2)+1 << "   ";
+      << "\r+:" << setw(2) << (int)round(m_batterysummary.maxTemp) << " " << (char)('A'+(m_batterysummary.maxTemp_box/2)) << (m_batterysummary.maxTemp_box%2)+1
+      << " -:" << setw(2) << (int)round(m_batterysummary.minTemp) << " " << (char)('A'+(m_batterysummary.minTemp_box/2)) << (m_batterysummary.minTemp_box%2)+1 << " I:" << (int)round(m_inverterdata.heatsinktemp);
 
       //std::cout.setf(ios::fixed,ios::floatfield);
       //std::cout << std::showpoint << setprecision(1) << setw(6) << kwh << "kWhr \n";
@@ -735,7 +771,7 @@ void BMSThread::threadWorker() {
       //displayserial->putc(0x80); // move to 0,0
 
       if (*DI_ChargeSwitch) {
-        sprintf(&dispprint[1], "%d", m_batterysummary.numBalancing);
+        sprintf(&dispprint[1], "%3dV %2dA %3d", m_batterysummary.numBalancing);
       } else {
         int64_t power = m_batterysummary.totalCurrent*((int64_t)m_batterysummary.totalVoltage)/1000000;
         // Guards display overflow
@@ -799,9 +835,9 @@ void BMSThread::threadWorker() {
     } else {
       std::bitset<16> pecprint(pecStatus);
 
-      mail_t *msg = m_outbox->alloc();
+      mail_t *msg = m_inbox_main->alloc();
       msg->msg_event = BATT_ERR;
-      m_outbox->put(msg);
+      m_inbox_main->put(msg);
       // std::cout << "PEC error! " << pecprint << '\n';
       *led3 = 1;      
       ioexp_bits |= (1 << MCP_PIN_EGR);

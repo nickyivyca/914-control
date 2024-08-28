@@ -111,6 +111,13 @@ enum thread_message {INIT_ALL, NEW_CELL_DATA, BATT_ERR, BATT_STARTUP, CHARGE_ENA
 #define BMS_BALANCE_VOLTAGE_THRESHOLD 3900
 #endif
 
+// Cells will only balance below this DC Current
+//
+// Units: millivolts
+#ifndef BMS_BALANCE_CURRENT_LIMIT
+#define BMS_BALANCE_CURRENT_LIMIT 2000
+#endif
+
 // Lower threshold when fault will be thrown for cell voltage
 //
 // Units: millivolts

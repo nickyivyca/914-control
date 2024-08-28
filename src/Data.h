@@ -21,6 +21,15 @@ typedef struct {
 } batterydata_t;
 
 typedef struct {
+  uint16_t VAC;
+  uint16_t IAC;
+} chargerdata_t;
+
+typedef struct {
+  int16_t heatsinktemp;
+} inverterdata_t;
+
+typedef struct {
   uint16_t minVoltage;
   uint8_t minVoltage_cell;
   uint16_t maxVoltage;

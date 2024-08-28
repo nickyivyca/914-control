@@ -19,8 +19,8 @@
 class BMSThread {
  public:
 
-  BMSThread(Mail<mail_t, MSG_QUEUE_SIZE>* outbox, Mail<mail_t, MSG_QUEUE_SIZE>* inbox, 
-  LTC681xBus* bus, LTC6813Bus* bus_6813);
+  BMSThread(Mail<mail_t, MSG_QUEUE_SIZE>* inbox_main, Mail<chargerdata_t, MSG_QUEUE_SIZE>* inbox_charger, 
+  Mail<inverterdata_t, MSG_QUEUE_SIZE>* inbox_inverter, LTC681xBus* bus, LTC6813Bus* bus_6813);
 
   // Function to allow for starting threads from static context
   static void startThread(BMSThread *p) {
@@ -44,8 +44,9 @@ class BMSThread {
   }
 
  private:
-  Mail<mail_t, MSG_QUEUE_SIZE>* m_inbox;
-  Mail<mail_t, MSG_QUEUE_SIZE>* m_outbox;
+  Mail<mail_t, MSG_QUEUE_SIZE>* m_inbox_main;
+  Mail<chargerdata_t, MSG_QUEUE_SIZE>* m_inbox_charger;
+  Mail<inverterdata_t, MSG_QUEUE_SIZE>* m_inbox_inverter;
   LTC681xBus* m_bus;
   LTC6813Bus* m_6813bus;
 
