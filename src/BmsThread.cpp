@@ -107,6 +107,11 @@ void BMSThread::threadWorker() {
 
   uint8_t canrun = 0;
 
+  int totalCurrent_previous = 0;
+
+  m_chargerdata.VAC = 0;
+  m_chargerdata.IAC = 0;
+
 
   //uint32_t curtime = t.read_us();
   //std::cout << "Data thread received init\n";
@@ -419,7 +424,7 @@ void BMSThread::threadWorker() {
 
                   // And turn on G light to show low temp
                   ioexp_bits |= (1 << MCP_PIN_G);
-                } else if (((*DI_ChargeSwitch && (voltage > BMS_BALANCE_VOLTAGE_THRESHOLD)) || !stringcheckOK) && ((voltage > prevMinVoltage) && (voltage - prevMinVoltage > BMS_DISCHARGE_THRESHOLD))) {
+                } else if (((*DI_ChargeSwitch && (voltage > BMS_BALANCE_VOLTAGE_THRESHOLD)) || !stringcheckOK) && ((voltage > prevMinVoltage) && (voltage - prevMinVoltage > BMS_DISCHARGE_THRESHOLD)) && (totalCurrent_previous > BMS_BALANCE_CURRENT_LIMIT)) {
                   // else if normal balancing just turn on the balancing resistor
                   //printf("DISCHARGE CHIP: %d CELL: %d: %dmV (%dmV)\n", chip_loc, index, voltage, (voltage - prevMinVoltage));
                   conf.dischargeState.value |= (1 << j);
@@ -569,6 +574,8 @@ void BMSThread::threadWorker() {
     
 
       float totalCurrent_scaled = ((float)m_batterydata.totalCurrent)/1000.0;
+
+      totalCurrent_previous = m_batterydata.totalCurrent;
       
 
       // float totalVoltage_scaled = ((float)packVoltage)/1000.0;
@@ -771,7 +778,7 @@ void BMSThread::threadWorker() {
       //displayserial->putc(0x80); // move to 0,0
 
       if (*DI_ChargeSwitch) {
-        sprintf(&dispprint[1], "%3dV %2dA %3d", m_batterysummary.numBalancing);
+        sprintf(&dispprint[1], "%3dV %2dA %3d", m_chargerdata.VAC, m_chargerdata.IAC, m_batterydata.numBalancing);
       } else {
         int64_t power = m_batterysummary.totalCurrent*((int64_t)m_batterysummary.totalVoltage)/1000000;
         // Guards display overflow

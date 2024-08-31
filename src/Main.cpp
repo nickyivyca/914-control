@@ -60,6 +60,7 @@ void tach_update();
 void print_cpu_stats();
 void canRX();
 void processCAN();
+void sendChargerInfo();
 
 uint64_t prev_idle_time = 0;
 uint8_t tachcount = 0;
@@ -72,6 +73,13 @@ EventFlags eventFlags;
 //EventQueue CANqueue(4 * EVENTS_EVENT_SIZE);
 
 uint8_t canCount;
+
+uint16_t c1uac;
+uint16_t c2uac;
+uint16_t c3uac;
+uint8_t c1iac;
+uint8_t c2iac;
+uint8_t c3iac;
 
 int main() {
   // Init all io pins
@@ -108,6 +116,15 @@ int main() {
   osThreadSetPriority(osThreadGetId(), osPriorityHigh7);
   Timer t;
   t.start();
+
+  c1uac = 0;
+  c2uac = 0;
+  c3uac = 0;
+  c1iac = 0;
+  c2iac = 0;
+  c3iac = 0;
+
+
   while (1) {
     while(!inbox_main.empty()) {
       osEvent evt = inbox_main.get();
@@ -186,13 +203,31 @@ int main() {
               inbox_bms_inverter.put(msg_out);
             }
             break;
-          case 12345: // placeholder ID
+          case 519: // Charger 1 AC data
             {
-              // Charger data
-              chargerdata_t *msg_out = inbox_bms_charger.alloc();
-              msg_out->VAC = 0;
-              msg_out->IAC = 0;
-              inbox_bms_charger.put(msg_out);
+              c1uac = msg.data[1];
+              // iac is at bit 41, 9 bits long, scale 0.06 (3/50)
+              c1iac = ((((uint16_t)(msg.data[5] >> 1)) + (((uint16_t)msg.data[6]) << 7))*3)/50;
+              sendChargerInfo();
+              // printf("Received Charger 1 AC data %d %x %x\n", c1iac, msg.data[5], msg.data[6]);
+              break;
+            }
+          case 521: // Charger 2 AC data
+            {
+
+              c2uac = msg.data[1];
+              // iac is at bit 41, 9 bits long, scale 0.06 (3/50)
+              c2iac = ((((uint16_t)(msg.data[5] >> 1)) + (((uint16_t)msg.data[6]) << 7))*3)/50;
+              sendChargerInfo();
+              // printf("Received Charger 2 AC data %d \n", c2iac);
+              break;
+            }
+          case 523: // Charger 3 AC data
+            {
+              c3uac = msg.data[1];
+              // iac is at bit 41, 9 bits long, scale 0.06 (3/50)
+              c3iac = ((((uint16_t)(msg.data[5] >> 1)) + (((uint16_t)msg.data[6]) << 7))*3)/50;
+              sendChargerInfo();
               break;
             }
           default:
@@ -302,4 +337,25 @@ void canRX() {
       canqueue.push(msg);
   }
   //eventFlags.set(CAN_RX_INT_FLAG);
+}
+
+void sendChargerInfo() {
+  chargerdata_t *msg_out = inbox_bms_charger.alloc();
+  msg_out->VAC = 0;
+  uint8_t activecount = 0;
+  if (c1uac > 0) {
+    activecount++;
+    msg_out->VAC += c1uac;
+  }
+  if (c2uac > 0) {
+    activecount++;
+    msg_out->VAC += c2uac;
+  }
+  if (c3uac > 0) {
+    activecount++;
+    msg_out->VAC += c3uac;
+  }
+  msg_out->VAC /= activecount;
+  msg_out->IAC = c1iac + c2iac + c3iac;
+  inbox_bms_charger.put(msg_out);
 }
