@@ -206,8 +206,8 @@ int main() {
           case 519: // Charger 1 AC data
             {
               c1uac = msg.data[1];
-              // iac is at bit 41, 9 bits long, scale 0.06 (3/50)
-              c1iac = ((((uint16_t)(msg.data[5] >> 1)) + (((uint16_t)msg.data[6]) << 7))*3)/50;
+              // iac is at bit 41, 9 bits long, scale 0.066666.... (1/15)
+              c1iac = (((uint16_t)(msg.data[5] >> 1)) + (((uint16_t)msg.data[6]) << 7))/15;
               sendChargerInfo();
               // printf("Received Charger 1 AC data %d %x %x\n", c1iac, msg.data[5], msg.data[6]);
               break;
@@ -216,8 +216,8 @@ int main() {
             {
 
               c2uac = msg.data[1];
-              // iac is at bit 41, 9 bits long, scale 0.06 (3/50)
-              c2iac = ((((uint16_t)(msg.data[5] >> 1)) + (((uint16_t)msg.data[6]) << 7))*3)/50;
+              // iac is at bit 41, 9 bits long, scale 0.066666.... (1/15)
+              c2iac = (((uint16_t)(msg.data[5] >> 1)) + (((uint16_t)msg.data[6]) << 7))/15;
               sendChargerInfo();
               // printf("Received Charger 2 AC data %d \n", c2iac);
               break;
@@ -225,8 +225,8 @@ int main() {
           case 523: // Charger 3 AC data
             {
               c3uac = msg.data[1];
-              // iac is at bit 41, 9 bits long, scale 0.06 (3/50)
-              c3iac = ((((uint16_t)(msg.data[5] >> 1)) + (((uint16_t)msg.data[6]) << 7))*3)/50;
+              // iac is at bit 41, 9 bits long, scale 0.066666.... (1/15)
+              c3iac = (((uint16_t)(msg.data[5] >> 1)) + (((uint16_t)msg.data[6]) << 7))/15;
               sendChargerInfo();
               break;
             }
