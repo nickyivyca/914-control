@@ -20,6 +20,49 @@
 #include "BmsThread.h"
 
 
+#if LINK_TEST
+/*
+ * One line of the link test pattern:
+ *
+ *     LT<8 hex digits of seq>:<LINK_TEST_PAYLOAD_LEN payload bytes>\n
+ *
+ * The payload is a walking sequence of printable ASCII, 33..126, phase-shifted by the line's
+ * sequence number so no two consecutive lines are identical -- a repeating pattern would let
+ * a duplicated or dropped byte hide inside its own repetition. Every byte is therefore a
+ * function of (seq, offset) alone, which is what lets the host rebuild the expected stream
+ * from any single intact header and pinpoint each bad byte.
+ *
+ * Emitted with cout.write() rather than the << chain, so this measures the link and not the
+ * iostream formatting that Step 2 already measured separately.
+ */
+static void emit_link_test_line(uint32_t seq)
+{
+    static const char hexd[] = "0123456789ABCDEF";
+    static char line[11 + LINK_TEST_PAYLOAD_LEN + 1];
+
+    line[0] = 'L';
+    line[1] = 'T';
+    for (int i = 0; i < 8; i++) {
+        line[2 + i] = hexd[(seq >> (28 - 4 * i)) & 0xF];
+    }
+    line[10] = ':';
+    for (uint32_t i = 0; i < LINK_TEST_PAYLOAD_LEN; i++) {
+        line[11 + i] = (char)(33 + ((seq * 7u + i) % 94u));
+    }
+    line[11 + LINK_TEST_PAYLOAD_LEN] = '\n';
+
+#if LINK_TEST_CHUNK > 0
+    for (uint32_t off = 0; off < sizeof(line); off += LINK_TEST_CHUNK) {
+        uint32_t n = sizeof(line) - off;
+        if (n > LINK_TEST_CHUNK) n = LINK_TEST_CHUNK;
+        std::cout.write(line + off, n);
+    }
+#else
+    std::cout.write(line, sizeof(line));
+#endif
+}
+#endif
+
 BMSThread::BMSThread(Mail<mail_t, MSG_QUEUE_SIZE>* inbox_main, Mail<chargerdata_t, MSG_QUEUE_SIZE>* inbox_charger, 
   Mail<inverterdata_t, MSG_QUEUE_SIZE>* inbox_inverter, LTC681xBus* bus, LTC6813Bus* bus_6813) : 
    m_inbox_main(inbox_main), m_inbox_charger(inbox_charger), m_inbox_inverter(inbox_inverter), m_bus(bus), m_6813bus(bus_6813) {
@@ -116,6 +159,16 @@ void BMSThread::threadWorker() {
 
   //uint32_t curtime = t.read_us();
   //std::cout << "Data thread received init\n";
+
+#if STDIO_PARITY_EVEN
+  // The write comes first on purpose. mbed builds the stdio serial object lazily on first
+  // use, and its constructor sets 8N1 -- so reconfiguring the UART before that point would
+  // simply be undone. `serial` is a separate object on the same pins, but set_format() acts
+  // on the shared UART peripheral, so setting it here sticks for stdio too.
+  std::cout << "\n";
+  std::cout.flush();
+  serial->format(8, SerialBase::Even, 1);
+#endif
 
   // Print CSV header
   std::cout << "time_millis,packVoltage";
@@ -702,6 +755,14 @@ void BMSThread::threadWorker() {
         // notes/plans/vcu-logging-refactor.md in the 914 notes repo.
         uint32_t printStartUs = us_ticker_read();
 #endif
+#if LINK_TEST
+        {
+          static uint32_t linkTestSeq = 0;
+          for (uint16_t k = 0; k < LINK_TEST_LINES_PER_PRINT; k++) {
+            emit_link_test_line(linkTestSeq++);
+          }
+        }
+#else
         // Print line of CSV data
         std::cout << std::fixed << std::setprecision(1) << timestamp << ',' << m_batterydata.packVoltage/1000.0 ;
         for (uint16_t i = 0; i < NUM_STRINGS; i++) {
@@ -741,6 +802,7 @@ void BMSThread::threadWorker() {
         std::cout << ',' << (unsigned long)canRxMaxLatencyUs;
         canRxMaxLatencyUs = 0;
         std::cout << '\n';
+#endif // LINK_TEST
 
 #if PRINT_TIMING
         // Timed before the report below is emitted, so the report is not in its own numbers.

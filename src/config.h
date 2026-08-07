@@ -65,6 +65,52 @@
 #define PRINT_STACK_STATS 0
 #endif
 
+// Link quality test mode. Replaces the CSV with a deterministic, self-describing pattern so
+// the host can reconstruct exactly what should have arrived and classify every corrupted byte
+// -- inserted, dropped or substituted -- rather than only noticing corruption that happens to
+// break the CSV's structure. A flipped bit inside a cell voltage reads as a plausible 4005 mV
+// and is invisible to a structural check, so a CSV-based figure is only ever a lower bound.
+//
+// Everything else -- BMS scanning, contactor logic, CAN -- keeps running; only the serial
+// payload changes. Off by default; this is a bench instrument, not a mode to drive with.
+#ifndef LINK_TEST
+#define LINK_TEST 0
+#endif
+
+// Pattern lines emitted per BMS print interval. 1 matches the CSV's ~2 KB/s. The interval is
+// 500 ms and a line is 963 bytes, so the ceiling is the baud rate: 23 lines at 460800, 5 at
+// 115200. Raising this is how "is it worse at higher data rates" gets tested at a fixed baud,
+// separately from the line rate itself -- they are different variables and may not behave the
+// same way.
+#ifndef LINK_TEST_LINES_PER_PRINT
+#define LINK_TEST_LINES_PER_PRINT 1
+#endif
+
+// Chosen so a pattern line totals 963 bytes, matching a real CSV record: "LT" + 8 hex digits
+// of sequence number + ":" is 11, plus payload, plus the newline.
+#ifndef LINK_TEST_PAYLOAD_LEN
+#define LINK_TEST_PAYLOAD_LEN 951
+#endif
+
+// Bytes per write() call when emitting a pattern line. 0 means one write for the whole line.
+//
+// This is the variable that separates "the wire loses bytes" from "the way we hand bytes to
+// stdio loses bytes". A CSV record is ~206 << operations averaging ~4.7 bytes each, whereas a
+// pattern line at chunk 0 is a single 964-byte write. If corruption tracks the chunk size
+// rather than the data rate, the fault is above the UART rather than on it.
+#ifndef LINK_TEST_CHUNK
+#define LINK_TEST_CHUNK 0
+#endif
+
+// Even parity on the stdio UART. The host sets the same through the CDC line coding, which
+// the interface MCU applies to its own UART side. This does not report errors by itself --
+// the point is the comparison. If the corruption rate moves, the damage is happening on the
+// wire between the LPC1768 and the interface MCU. If it does not move, the wire is innocent
+// and the fault is in the bridge, the USB stack, or the host.
+#ifndef STDIO_PARITY_EVEN
+#define STDIO_PARITY_EVEN 0
+#endif
+
 // Time the CSV emit in BmsThread and report min/avg/max every PRINT_TIMING_SAMPLES prints.
 // A measurement aid for the transport work, not something to leave on: the report is an
 // extra non-CSV line in the data stream. Off by default.
