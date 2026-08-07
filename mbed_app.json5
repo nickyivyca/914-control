@@ -5,11 +5,24 @@
             "platform.stdio-baud-rate": 460800,
             "platform.default-serial-baud-rate": 460800,
 
-            // stdio uses UnbufferedSerial. See notes/plans/vcu-logging-refactor.md (Step 2):
-            // BufferedSerial previously tripped the watchdog; the suspected causes are the
-            // 1280-byte thread stack below and the 256-byte default TX buffer against
-            // ~1000-byte writes. Left unbuffered until that is measured, not re-litigated here.
-            "platform.stdio-buffered-serial": 0,
+            // stdio is buffered, with a TX buffer sized past one CSV record (~963 bytes).
+            // Both halves of that matter, and both are measured rather than assumed -- see
+            // Step 2 of notes/plans/vcu-logging-refactor.md. Time spent in the CSV emit:
+            //
+            //   UnbufferedSerial            24.63 ms   spins on TX-ready for all 963 bytes
+            //   BufferedSerial, 256 B buf   19.60 ms   queues 256, then blocks on the rest
+            //   BufferedSerial, 1536 B buf   5.41 ms   whole record queued, returns
+            //
+            // against a theoretical 20.90 ms to shift 963 bytes at 460800 8N1. So the UART
+            // wait was ~85% of the cost, and a buffer smaller than a record recovers almost
+            // none of it -- which is why the earlier attempt at BufferedSerial looked like it
+            // was not worth having. The other reason it failed then was the undersized BMS
+            // thread stack, since fixed; a 3-minute soak here ran clean with no watchdog
+            // reset, errCount 0, and perfectly uniform 500 ms cadence.
+            //
+            // Costs ~2 KB of IRAM1 (58.9% -> 65.0%).
+            "platform.stdio-buffered-serial": 1,
+            "drivers.uart-serial-txbuf-size": 1536,
 
             // Main peaked at 1520 bytes of the previous 2048 on the car -- only 528 spare, and
             // the charger CAN paths were not exercised in that capture. Raised for margin after

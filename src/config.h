@@ -65,6 +65,17 @@
 #define PRINT_STACK_STATS 0
 #endif
 
+// Time the CSV emit in BmsThread and report min/avg/max every PRINT_TIMING_SAMPLES prints.
+// A measurement aid for the transport work, not something to leave on: the report is an
+// extra non-CSV line in the data stream. Off by default.
+#ifndef PRINT_TIMING
+#define PRINT_TIMING 0
+#endif
+
+#ifndef PRINT_TIMING_SAMPLES
+#define PRINT_TIMING_SAMPLES 20
+#endif
+
 // Depth of the CAN receive queue, in frames. The main loop drains it once per MAIN_PERIOD,
 // so this sets the frame rate the car can absorb: depth / (MAIN_PERIOD/1000) frames per
 // second. The old depth of 32 gave 640 frames/s, which is ample for the handful of IDs used

@@ -693,6 +693,15 @@ void BMSThread::threadWorker() {
       // printbuff.str(std::string());
 
       if (++printCount == CELL_PRINT_MULTIPLE) {
+#if PRINT_TIMING
+        // Wall time of the whole CSV emit. Under UnbufferedSerial this is formatting plus
+        // transmission serialised, because the write spins on the TX-ready flag; under
+        // BufferedSerial with a TX buffer larger than one record the write returns once
+        // queued, so the same number is the formatting cost on its own. The difference
+        // between the two builds is what the UART actually costs. See Step 2 of
+        // notes/plans/vcu-logging-refactor.md in the 914 notes repo.
+        uint32_t printStartUs = us_ticker_read();
+#endif
         // Print line of CSV data
         std::cout << std::fixed << std::setprecision(1) << timestamp << ',' << m_batterydata.packVoltage/1000.0 ;
         for (uint16_t i = 0; i < NUM_STRINGS; i++) {
@@ -732,9 +741,31 @@ void BMSThread::threadWorker() {
         std::cout << ',' << (unsigned long)canRxMaxLatencyUs;
         canRxMaxLatencyUs = 0;
         std::cout << '\n';
-        //uint32_t curtime = t.read_us();
 
-        //std::cout << "Data Print time: " << (t.read_us() - curtime) << "us \n";     
+#if PRINT_TIMING
+        // Timed before the report below is emitted, so the report is not in its own numbers.
+        uint32_t printUs = us_ticker_read() - printStartUs;
+        static uint32_t timingMin = 0xFFFFFFFF;
+        static uint32_t timingMax = 0;
+        static uint32_t timingSum = 0;
+        static uint16_t timingCount = 0;
+
+        if (printUs < timingMin) timingMin = printUs;
+        if (printUs > timingMax) timingMax = printUs;
+        timingSum += printUs;
+
+        if (++timingCount >= PRINT_TIMING_SAMPLES) {
+          printf("PRINTTIME: n=%u min=%luus avg=%luus max=%luus\n",
+                 (unsigned)timingCount,
+                 (unsigned long)timingMin,
+                 (unsigned long)(timingSum / timingCount),
+                 (unsigned long)timingMax);
+          timingMin = 0xFFFFFFFF;
+          timingMax = 0;
+          timingSum = 0;
+          timingCount = 0;
+        }
+#endif
 
         printCount = 0;
       }
