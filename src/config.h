@@ -53,10 +53,16 @@
 #endif
 
 // Periodic per-thread stack high-water reporting on the console. Useful during the Mbed CE
-// bring-up; set to 0 before logging real drives, since it interleaves non-CSV lines into the
-// data stream.
+// bring-up; off by default because it interleaves non-CSV lines into the data stream. Turn
+// it on only when measuring stacks.
+//
+// It is NOT the cause of the rare single-byte insertions seen in serial captures (a stray
+// comma, an extra digit in a timestamp, roughly one per 100 KB). Turning this off did not
+// stop them, and they appear in captures taken before the CAN RX work and before the Mbed CE
+// port -- see notes/artifacts/csv_corruption_scan.py in the 914 notes repo. They come from
+// the link, not from stdout contention between threads.
 #ifndef PRINT_STACK_STATS
-#define PRINT_STACK_STATS 1
+#define PRINT_STACK_STATS 0
 #endif
 
 // Depth of the CAN receive queue, in frames. The main loop drains it once per MAIN_PERIOD,

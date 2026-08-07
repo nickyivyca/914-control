@@ -727,7 +727,10 @@ void BMSThread::threadWorker() {
         std::cout << ',' << (unsigned long)canRxSwDrops;
         std::cout << ',' << (unsigned long)canRxHwOverruns;
         std::cout << ',' << (unsigned long)canRxQueuePeak;
+        // Read-and-clear: canLatUs is the max over this print interval. See CanRx.h for why
+        // a lifetime max would be useless here.
         std::cout << ',' << (unsigned long)canRxMaxLatencyUs;
+        canRxMaxLatencyUs = 0;
         std::cout << '\n';
         //uint32_t curtime = t.read_us();
 

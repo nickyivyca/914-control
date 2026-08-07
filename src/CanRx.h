@@ -73,8 +73,20 @@ extern volatile uint32_t canRxHwOverruns;
 extern volatile uint32_t canRxQueuePeak;
 
 // Longest time any frame sat in canqueue between the ISR pushing it and the main loop
-// popping it, in microseconds. Bounded by the drain interval in normal operation, so a
-// value near or above MAIN_PERIOD*1000 means the main loop, not the queue, is the limit.
+// popping it, in microseconds. Reset by the CSV printer each time it is reported, so this is
+// the max over one print interval, not over the run.
+//
+// It has to be per-interval, because a lifetime max here is degenerate: the worst frame is
+// whichever one arrives just after a drain, and the phase between a sender's transmit clock
+// and this board's 50 ms drain boundary drifts by the difference between the two crystals
+// (measured at ~19 ppm against the inverter, i.e. ~9.6 us per 500 ms). The lifetime max
+// therefore ratchets monotonically up to the drain interval over ~40 minutes and then sits
+// there reporting MAIN_PERIOD forever, whatever the traffic does. Per interval it instead
+// tracks how close the main loop is running to its own period, and spikes if it stalls.
+//
+// The read-and-clear in BmsThread races the main loop's update, which can drop a single
+// sample. That is acceptable for telemetry and cheaper than a critical section on a value
+// that is only ever compared against MAIN_PERIOD.
 extern volatile uint32_t canRxMaxLatencyUs;
 
 #endif // CAN_RX_H
