@@ -193,11 +193,20 @@ void LTC6813Bus::getGpio(uint16_t voltages[NUM_CHIPS][9]) {
 }
 
 uint8_t LTC6813Bus::getCombined(uint16_t cellVoltages[NUM_CHIPS][18], uint16_t adcVoltages[NUM_CHIPS][2]) {
+  // TEMPORARY Mbed CE port timing instrumentation. The LTC6813 isoSPI ports drop to idle after
+  // tIDLE (4.3ms min), so the gaps around the conversion poll and the seven register reads are
+  // what decide whether the chain is awake. Printed once per second. Remove once port is stable.
+  static uint32_t timingCount = 0;
+  bool logTiming = ((timingCount++ % 10) == 0);
+  uint32_t t_entry = us_ticker_read();
+
   //Timer t;
   //t.start();
   m_bus.SendCommandAndPoll(LTC681xBus::BuildChainBusCommand
     (StartCombinedCellVoltageGpioConversion(AdcMode::k7k, false)));
   //t.stop();
+
+  uint32_t t_poll = us_ticker_read();
 
   //std::cout << t.read_ms() << '\n';
   //std::cout << "Voltage: " << t.read_us() << '\n';
@@ -206,22 +215,43 @@ uint8_t LTC6813Bus::getCombined(uint16_t cellVoltages[NUM_CHIPS][18], uint16_t a
   uint8_t rxbuf[7][NUM_CHIPS*6];
 
   //m_bus.wakeupChainSpi();
+  uint32_t t_read[7];
   uint8_t pecStatuses = 0;
-  pecStatuses |= (m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadCellVoltageGroupA()), 
+  pecStatuses |= (m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadCellVoltageGroupA()),
     rxbuf[0]) == LTC681xBus::LTC681xBusStatus::BadPec);
-  pecStatuses |= (m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadCellVoltageGroupB()), 
+  t_read[0] = us_ticker_read();
+  pecStatuses |= (m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadCellVoltageGroupB()),
     rxbuf[1]) == LTC681xBus::LTC681xBusStatus::BadPec)<<1;
-  pecStatuses |= (m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadCellVoltageGroupC()), 
+  t_read[1] = us_ticker_read();
+  pecStatuses |= (m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadCellVoltageGroupC()),
     rxbuf[2]) == LTC681xBus::LTC681xBusStatus::BadPec)<<2;
-  pecStatuses |= (m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadCellVoltageGroupD()), 
+  t_read[2] = us_ticker_read();
+  pecStatuses |= (m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadCellVoltageGroupD()),
     rxbuf[3]) == LTC681xBus::LTC681xBusStatus::BadPec)<<3;
-  pecStatuses |= (m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadCellVoltageGroupE()), 
+  t_read[3] = us_ticker_read();
+  pecStatuses |= (m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadCellVoltageGroupE()),
     rxbuf[4]) == LTC681xBus::LTC681xBusStatus::BadPec)<<4;
-  pecStatuses |= (m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadCellVoltageGroupF()), 
+  t_read[4] = us_ticker_read();
+  pecStatuses |= (m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadCellVoltageGroupF()),
     rxbuf[5]) == LTC681xBus::LTC681xBusStatus::BadPec)<<5;
-  pecStatuses |= (m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadAuxiliaryGroupA()), 
+  t_read[5] = us_ticker_read();
+  pecStatuses |= (m_bus.SendReadCommand(LTC681xBus::BuildChainBusCommand(ReadAuxiliaryGroupA()),
     rxbuf[6]) == LTC681xBus::LTC681xBusStatus::BadPec)<<6;
+  t_read[6] = us_ticker_read();
   //ThisThread::sleep_for(1);
+
+  if (logTiming) {
+    std::cout << "SPI: poll=" << (t_poll - t_entry) << "us reads=";
+    uint32_t prev = t_poll;
+    for (int i = 0; i < 7; i++) {
+      std::cout << (t_read[i] - prev) << ',';
+      prev = t_read[i];
+    }
+    std::cout << " total=" << (t_read[6] - t_entry) << "us"
+              << " firstbytes=" << std::hex
+              << (int)rxbuf[0][0] << ' ' << (int)rxbuf[0][1] << ' ' << (int)rxbuf[0][2] << ' '
+              << (int)rxbuf[0][6] << ' ' << (int)rxbuf[0][7] << std::dec << std::endl;
+  }
 
   // Voltage = val • 100μV
   uint8_t measCursor = 0;
