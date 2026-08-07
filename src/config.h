@@ -42,6 +42,14 @@
 #define WATCHDOG_TIMEOUT 2000
 #endif
 
+// Stack for the BMS thread, which does the iostream-heavy CSV and display formatting.
+// The rtos.thread-stack-size default of 1280 bytes is not enough for it under Mbed CE and
+// overflowed into the RTOS memory holding the SPI mutex. Sized to be measured, not guessed --
+// see print_stack_stats() in Main.cpp.
+#ifndef BMS_THREAD_STACK_SIZE
+#define BMS_THREAD_STACK_SIZE 8192
+#endif
+
 // Delay in ms before zeroing current sensor and closing contactors
 #ifndef INIT_DELAY
 #define INIT_DELAY 750

@@ -14,6 +14,10 @@
             "rtos.main-thread-stack-size": 2048,
             "rtos.thread-stack-size": 1280,
 
+            // TEMPORARY: lets Main.cpp report per-thread high-water marks so the BMS thread
+            // stack can be sized from measurement. Remove once the port is stable.
+            "platform.stack-stats-enabled": true,
+
             "target.printf_lib": "minimal-printf",
             "platform.minimal-printf-enable-floating-point": true,
             "platform.minimal-printf-set-floating-point-max-decimals": 2,

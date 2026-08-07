@@ -58,6 +58,7 @@ Ticker tachometer;
 void initIO();
 void tach_update();
 void print_cpu_stats();
+void print_stack_stats();
 void canRX();
 void processCAN();
 void sendChargerInfo();
@@ -108,9 +109,16 @@ int main() {
   bool canInitialized = false;
   canCount = 0;
 
-  Thread bmsThreadThread;
+  // The BMS thread ran on the 1280-byte rtos.thread-stack-size default before the Mbed CE
+  // port and overflowed it there, corrupting the RTOS memory holding the SPI mutex (fatal
+  // "Mutex: Parameter error", every LTC6813 PEC read failing). Sized generously here so the
+  // high-water mark can be measured; trim once print_stack_stats() reports a real figure.
+  Thread bmsThreadThread(osPriorityNormal, BMS_THREAD_STACK_SIZE);
   BMSThread bmsThread(&inbox_main, &inbox_bms_charger, &inbox_bms_inverter, &ltcBus, &ltc6813Bus);
-  bmsThreadThread.start(callback(&BMSThread::startThread, &bmsThread));
+  osStatus bmsStartStatus = bmsThreadThread.start(callback(&BMSThread::startThread, &bmsThread));
+  if (bmsStartStatus != osOK) {
+    std::cout << "FATAL: BMS thread failed to start, status " << bmsStartStatus << std::endl;
+  }
   Thread CANThread(osPriorityAboveNormal, 512);
 
   osThreadSetPriority(osThreadGetId(), osPriorityHigh7);
@@ -238,6 +246,14 @@ int main() {
 
     //print_cpu_stats();
 
+    // TEMPORARY: report stack high-water marks every ~5s so BMS_THREAD_STACK_SIZE can be
+    // sized from measurement rather than guessed. Remove once the port is stable.
+    static uint16_t stackStatsCount = 0;
+    if (++stackStatsCount >= (5000 / MAIN_PERIOD)) {
+      stackStatsCount = 0;
+      print_stack_stats();
+    }
+
     ThisThread::sleep_for(MAIN_PERIOD - (t.read_ms()%MAIN_PERIOD));
   }
 }
@@ -322,6 +338,23 @@ void print_cpu_stats()
     printf("   Sleep: %lld", stats.sleep_time);
     printf("   DeepSleep: %lld\n", stats.deep_sleep_time);
     printf("Idle: %d%% Usage: %d%%\n\n", idle, usage);
+}
+
+// TEMPORARY Mbed CE port instrumentation. Reports each thread's reserved stack against its
+// observed peak, so BMS_THREAD_STACK_SIZE can be trimmed to a measured figure. "max_size" is
+// the high-water mark since boot. Remove once the port is stable.
+void print_stack_stats()
+{
+    mbed_stats_stack_t stats[8];
+    size_t count = mbed_stats_stack_get_each(stats, 8);
+
+    for (size_t i = 0; i < count; i++) {
+        printf("STACK: thread 0x%08lX reserved %lu peak %lu headroom %lu\n",
+               (unsigned long)stats[i].thread_id,
+               (unsigned long)stats[i].reserved_size,
+               (unsigned long)stats[i].max_size,
+               (unsigned long)(stats[i].reserved_size - stats[i].max_size));
+    }
 }
 
 
