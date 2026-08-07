@@ -18,10 +18,6 @@
 #include "Data.h"
 #include "BmsThread.h"
 
-// TEMPORARY boot-hang instrumentation for the Mbed CE port. Prints a breadcrumb so a hang
-// can be located by whichever marker was the last to appear. Remove once the port is stable.
-#define BOOTMARK(msg) do { std::cout << "BOOT: " << msg << std::endl; } while (0)
-
 
 BMSThread::BMSThread(Mail<mail_t, MSG_QUEUE_SIZE>* inbox_main, Mail<chargerdata_t, MSG_QUEUE_SIZE>* inbox_charger, 
   Mail<inverterdata_t, MSG_QUEUE_SIZE>* inbox_inverter, LTC681xBus* bus, LTC6813Bus* bus_6813) : 
@@ -149,8 +145,6 @@ void BMSThread::threadWorker() {
   }
   std::cout << ",hsTemp,numBalancing,errCount\n";
 
-  BOOTMARK("header done");
-
   //serial->printf(printbuff.str().c_str());
   /*std::cout << printbuff.str();
   printbuff.str(std::string());*/
@@ -164,22 +158,16 @@ void BMSThread::threadWorker() {
 
   uint8_t dispinit[3] = {0x0C, 0x11, 0x16};
 
-  BOOTMARK("disp write 1");
   displayserial->write(dispinit, 1);
-  BOOTMARK("disp sleep");
   ThisThread::sleep_for(5);
-  BOOTMARK("disp write 2");
   displayserial->write(&dispinit[1], 2);
-  BOOTMARK("disp write 2 done");
 
   // add custom characters
   uint8_t customchar = 0b00010000;
   //uint8_t charindex = 0xf8;
   //displayserial->putc(0x94);// move to second row to test characters
   uint8_t charinit[9] = {0xf8, 0,0,0,0,0,0,0,0};
-  BOOTMARK("charinit write");
   displayserial->write(charinit, 9);
-  BOOTMARK("charinit done");
   //displayserial->putc(charindex);
   /*for (uint8_t j = 0; j < 8; j++) {
     displayserial->putc(0);
@@ -193,7 +181,6 @@ void BMSThread::threadWorker() {
       charinit[j+1] = customchar;
     }
     displayserial->write(charinit, 9);
-    BOOTMARK("customchar");
 
     customchar |= (customchar >> 1);
     charinit[0]++;
@@ -211,8 +198,6 @@ void BMSThread::threadWorker() {
   //std::cout << "Init Print time: " << (t.read_us() - curtime) << "us \n";
 
 
-
-  BOOTMARK("entering main loop");
 
   while (true) {
     //uint32_t startTime = t.read_ms();
@@ -856,7 +841,6 @@ void BMSThread::threadWorker() {
 
     } else {
       std::bitset<16> pecprint(pecStatus);
-      BOOTMARK("PEC fail, per-chip status " << pecprint);
 
       mail_t *msg = m_inbox_main->alloc();
       msg->msg_event = BATT_ERR;

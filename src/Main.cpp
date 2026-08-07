@@ -246,13 +246,13 @@ int main() {
 
     //print_cpu_stats();
 
-    // TEMPORARY: report stack high-water marks every ~5s so BMS_THREAD_STACK_SIZE can be
-    // sized from measurement rather than guessed. Remove once the port is stable.
+#if PRINT_STACK_STATS
     static uint16_t stackStatsCount = 0;
     if (++stackStatsCount >= (5000 / MAIN_PERIOD)) {
       stackStatsCount = 0;
       print_stack_stats();
     }
+#endif
 
     ThisThread::sleep_for(MAIN_PERIOD - (t.read_ms()%MAIN_PERIOD));
   }
@@ -340,9 +340,9 @@ void print_cpu_stats()
     printf("Idle: %d%% Usage: %d%%\n\n", idle, usage);
 }
 
-// TEMPORARY Mbed CE port instrumentation. Reports each thread's reserved stack against its
-// observed peak, so BMS_THREAD_STACK_SIZE can be trimmed to a measured figure. "max_size" is
-// the high-water mark since boot. Remove once the port is stable.
+// Reports each thread's reserved stack against its observed peak, so the stack sizes can be
+// set from measurement. "max_size" is the high-water mark since boot. Gated by
+// PRINT_STACK_STATS; requires platform.stack-stats-enabled in mbed_app.json5.
 void print_stack_stats()
 {
     mbed_stats_stack_t stats[8];

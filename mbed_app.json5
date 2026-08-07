@@ -11,11 +11,15 @@
             // ~1000-byte writes. Left unbuffered until that is measured, not re-litigated here.
             "platform.stdio-buffered-serial": 0,
 
-            "rtos.main-thread-stack-size": 2048,
+            // Main peaked at 1520 bytes of the previous 2048 on the car -- only 528 spare, and
+            // the charger CAN paths were not exercised in that capture. Raised for margin after
+            // the BMS thread's 1280-byte stack overflowed by 152 bytes and corrupted the SPI
+            // mutex; RAM is not scarce here (IRAM1 57%, IRAM2 entirely unused).
+            "rtos.main-thread-stack-size": 3072,
             "rtos.thread-stack-size": 1280,
 
-            // TEMPORARY: lets Main.cpp report per-thread high-water marks so the BMS thread
-            // stack can be sized from measurement. Remove once the port is stable.
+            // Lets Main.cpp report per-thread high-water marks, so stack sizes are set from
+            // measurement rather than guessed. See PRINT_STACK_STATS in src/config.h.
             "platform.stack-stats-enabled": true,
 
             "target.printf_lib": "minimal-printf",
