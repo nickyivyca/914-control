@@ -5,15 +5,48 @@
 
 /*
  * mbed's CAN::read() takes a Mutex, but canRX() runs in CAN interrupt context,
- * where acquiring a mutex traps. The pre-Mbed-CE build worked around this by
- * editing mbed-os/drivers/source/CAN.cpp to comment out the lock()/unlock()
- * calls in read() only -- write() kept its mutex. That patched file was kept at
- * the repo root as CAN.cpp and hand-copied into the (gitignored) mbed-os tree.
+ * where acquiring a mutex traps. The chain, still intact in Mbed CE 7.0.0:
+ *   CAN::read()      -> lock()                      drivers/source/CAN.cpp:97, :206
+ *   CAN::lock()      -> _mutex.lock()
+ *   Mutex::lock()    -> osMutexAcquire(); any non-osOK raises a FATAL
+ *                       MBED_ERROR_CODE_MUTEX_LOCK_FAILED
+ *                                                   rtos/source/Mutex.cpp:65-75
+ *   osMutexAcquire() -> returns osErrorISR when IsException() || IsIrqMasked()
+ *                                        cmsis/CMSIS-RTX/Source/rtx_mutex.c:658
  *
- * Mbed CE still locks in read(), and a patch inside a submodule would be silently
- * lost on update. can_t _can is protected, so a thin subclass can provide the
- * lock-free read directly and leave every other CAN method -- including write()
- * and its mutex -- exactly as upstream.
+ * Why the read must happen in the ISR at all: on LPC17xx the receive interrupt
+ * stays asserted until the receive buffer is released, and the only thing that
+ * releases it is `obj->dev->CMR = 0x04` inside can_read() itself
+ * (targets/TARGET_NXP/TARGET_LPC17XX/can_api.c:427). Returning from the ISR
+ * without reading re-triggers it immediately. Deferring the read to a thread
+ * therefore also requires masking and unmasking the CAN interrupt around it.
+ *
+ * Origin: ARMmbed/mbed-os issue #5374 (2017-10-24). The read()-only unlock was
+ * posted by GitHub user omdathetkan on 2018-01-24, who noted it "can be done
+ * without modifying the mbed-os files by subclassing it in the application and
+ * adding a CAN::readUnsafe()" -- which is what this class does. Arm's
+ * SenRamakri recommended an event/mailbox reader thread instead; omdathetkan
+ * countered with the interrupt-clearing constraint described above.
+ *   https://github.com/ARMmbed/mbed-os/issues/5374#issuecomment-360232458
+ *
+ * Upstream status: fixed by PR #14688, merged 2021-07-12, released in mbed-os
+ * 6.13.0. That fix has two halves, and only one reaches this target -- the
+ * deferred can_read is STM/bxCAN-specific (the generic driver has no thread or
+ * semaphore machinery), so on LPC1768 the only thing that shipped is the
+ * RawCAN class, which Mbed CE does carry at drivers/include/drivers/RawCAN.h.
+ *
+ * Why not just use RawCAN: it overrides lock()/unlock() for the whole object,
+ * so write() becomes unlocked too. This project's earlier hand-patch of
+ * mbed-os/drivers/source/CAN.cpp unlocked read() only and kept write() locked,
+ * and that asymmetry is preserved here. It costs nothing today (BmsThread is
+ * the only writer) but keeps writers serialised if a second TX path is ever
+ * added -- e.g. the planned CAN telemetry/proxy work.
+ *
+ * The remaining race -- an unlocked ISR read against a locked thread write --
+ * is benign on the LPC17xx HAL: read and write touch disjoint registers except
+ * CMR, where each is a single store of self-clearing command bits using
+ * disjoint bit patterns (0x04 release-rx vs 0x21 transmit-request), and
+ * can_enable()'s read-modify-write on MOD is idempotent in both paths.
  */
 class IsrSafeCAN : public mbed::CAN {
 public:
