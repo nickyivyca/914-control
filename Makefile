@@ -1,67 +1,38 @@
 #
-# Build file for Formula Slug FS-2 bms
+# Build file for the 914 VCU / BMS firmware (Mbed CE / CMake).
+#
+# Mbed CE replaces mbed-tools: dependencies are git submodules, not .lib files,
+# and the build is plain CMake. After cloning:
+#
+#     git submodule update --init --recursive
 #
 
-MBED_TOOLCHAIN ?= GCC_ARM
-MBED_TARGET ?= LPC1768
-MBED_BUILD_PROFILE ?= release
+MBED_TARGET      ?= LPC1768
+UPLOAD_METHOD    ?= MBED
+CMAKE_BUILD_TYPE ?= Release
+BUILD_DIR        := build
 
-BUILD_DIR := cmake_build
+.PHONY: all configure build flash clean deps
 
-DEPENDENCIES := mbed-os lib-mbed-ltc681x
+all: build
 
-.PHONY: all
-all: build-release
-
-#
-# Dependency pulling
-# 
-
-.PHONY: deps
-deps: $(DEPENDENCIES)
-
-$(DEPENDENCIES):
-	mbed-tools deploy
-
-#
-# Build profiles
-#
+deps:
+	git submodule update --init --recursive
 
 $(BUILD_DIR):
-	mbed-tools configure -t $(MBED_TOOLCHAIN) -m $(MBED_TARGET) -b $(MBED_BUILD_PROFILE)
+	cmake -S . -B $(BUILD_DIR) -GNinja \
+		-DMBED_TARGET=$(MBED_TARGET) \
+		-DUPLOAD_METHOD=$(UPLOAD_METHOD) \
+		-DCMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE)
 
-.PHONY: build
-build: deps $(BUILD_DIR)
-	mbed-tools compile -t $(MBED_TOOLCHAIN) -m $(MBED_TARGET) -b $(MBED_BUILD_PROFILE)
+configure: $(BUILD_DIR)
 
-.PHONY: build-debug
-build-debug: MBED_BUILD_PROFILE=debug
-build-debug: build
+build: configure
+	cmake --build $(BUILD_DIR)
 
-.PHONY: build-release
-build-release: MBED_BUILD_PROFILE=release
-build-release: build
+# Flashes via the interface MCU's MBED mass-storage drive.
+flash: build
+	cmake --build $(BUILD_DIR) --target flash-914-control
 
-#
-# Flashing to devices
-#
-
-.PHONY: flash
-flash: deps $(BUILD_DIR)
-	mbed-tools compile -t $(MBED_TOOLCHAIN) -m $(MBED_TARGET) -b $(MBED_BUILD_PROFILE) -f
-
-#
-# STM32 F303 debug
-#
-
-.PHONY: debug
-debug: build-debug
-	arm-none-eabi-gdb -x .gdbinit ./$(BUILD_DIR)/$(MBED_TARGET)/$(MBED_BUILD_PROFILE)/$(MBED_TOOLCHAIN)/914.elf
-
-#
-# Utilities
-#
-
-.PHONY: clean
 clean:
 	rm -rf $(BUILD_DIR)

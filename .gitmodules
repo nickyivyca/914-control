@@ -1,0 +1,8 @@
+[submodule "mbed-os"]
+	path = mbed-os
+	url = https://github.com/mbed-ce/mbed-os.git
+	branch = release
+	shallow = true
+[submodule "lib-mbed-ltc681x"]
+	path = lib-mbed-ltc681x
+	url = https://github.com/nickyivyca/lib-mbed-ltc681x.git

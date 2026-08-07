@@ -2,6 +2,7 @@
 
 #include "mbed.h"
 #include "MCP23017.h"
+#include "IsrSafeCAN.h"
 
 #ifndef PIN_SERIAL2_TX
 #define PIN_SERIAL2_TX p9
@@ -104,7 +105,7 @@ extern BufferedSerial* displayserial;
 // Global pointer to can bus object
 //
 // This allows for all files to access the can bus output
-extern CAN* canBus;
+extern IsrSafeCAN* canBus;
 
 #ifndef PIN_DO_BATTCONTACTOR
 #define PIN_DO_BATTCONTACTOR p26

@@ -24,7 +24,7 @@
 
 UnbufferedSerial* serial;
 BufferedSerial* displayserial;
-CAN* canBus;
+IsrSafeCAN* canBus;
 
 MCP23017* ioexp;
 
@@ -253,7 +253,7 @@ void initIO() {
 
   //serial->printf("INIT\n");
   
-  canBus = new CAN(PIN_CAN_RX, PIN_CAN_TX, CAN_FREQUENCY);
+  canBus = new IsrSafeCAN(PIN_CAN_RX, PIN_CAN_TX, CAN_FREQUENCY);
   led1 = new DigitalOut(LED1);
   led2 = new DigitalOut(LED2);
   led3 = new DigitalOut(LED3);
@@ -333,7 +333,8 @@ void canRX() {
   //canBus->read(canmsg);
   CANMessage msg;
 
-  if (canBus->read(msg)) {
+  // readNoLock: canRX() is an ISR; CAN::read() would take a mutex here. See IsrSafeCAN.h.
+  if (canBus->readNoLock(msg)) {
       canqueue.push(msg);
   }
   //eventFlags.set(CAN_RX_INT_FLAG);

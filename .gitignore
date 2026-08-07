@@ -98,8 +98,8 @@ test_suite.json
 DELIVERY/
 
 
-mbed-os
+# mbed-os and lib-mbed-ltc681x are git submodules under Mbed CE -- no longer ignored.
 
 .mbedbuild
 cmake_build/
-lib-mbed-ltc681x
+build/

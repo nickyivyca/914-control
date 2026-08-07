@@ -1,0 +1,22 @@
+{
+    "target_overrides": {
+        "LPC1768": {
+            // Telemetry/debug link out through the interface MCU's UART-to-CDC bridge.
+            "platform.stdio-baud-rate": 460800,
+            "platform.default-serial-baud-rate": 460800,
+
+            // stdio uses UnbufferedSerial. See notes/plans/vcu-logging-refactor.md (Step 2):
+            // BufferedSerial previously tripped the watchdog; the suspected causes are the
+            // 1280-byte thread stack below and the 256-byte default TX buffer against
+            // ~1000-byte writes. Left unbuffered until that is measured, not re-litigated here.
+            "platform.stdio-buffered-serial": 0,
+
+            "rtos.main-thread-stack-size": 2048,
+            "rtos.thread-stack-size": 1280,
+
+            "target.printf_lib": "minimal-printf",
+            "platform.minimal-printf-enable-floating-point": true,
+            "platform.minimal-printf-set-floating-point-max-decimals": 2,
+        },
+    },
+}
