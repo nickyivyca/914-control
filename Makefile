@@ -6,6 +6,14 @@
 #
 #     git submodule update --init --recursive
 #
+# Note: neither `make` nor `mingw32-make` is installed on the Windows build machines
+# (this was equally true of the pre-port Makefile). There, use make.bat / make_upload.bat,
+# which are the primary entry points. This Makefile is for machines that do have make.
+#
+# Build type here is Release, matching the pre-port `MBED_BUILD_PROFILE ?= release`.
+# The .bat files use Develop, matching what `mbed-tools compile` (no -b) produced.
+# That split is inherited from the old build, not introduced by the port.
+#
 
 MBED_TARGET      ?= LPC1768
 UPLOAD_METHOD    ?= MBED
