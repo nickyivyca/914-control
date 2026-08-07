@@ -13,8 +13,8 @@
 
             // Main peaked at 1520 bytes of the previous 2048 on the car -- only 528 spare, and
             // the charger CAN paths were not exercised in that capture. Raised for margin after
-            // the BMS thread's 1280-byte stack overflowed by 152 bytes and corrupted the SPI
-            // mutex; RAM is not scarce here (IRAM1 57%, IRAM2 entirely unused).
+            // the BMS thread's 1280-byte stack overflowed by 24 bytes (56 in charge mode) and
+            // corrupted the SPI mutex; RAM is not scarce here (IRAM1 59%, IRAM2 31%).
             "rtos.main-thread-stack-size": 3072,
             "rtos.thread-stack-size": 1280,
 

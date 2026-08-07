@@ -44,9 +44,9 @@
 
 // Stack for the BMS thread, which does the iostream-heavy CSV and display formatting.
 // The rtos.thread-stack-size default of 1280 bytes is not enough for it: measured on the car,
-// it peaks at 1432 bytes, and the 152-byte overflow corrupted the RTOS memory holding the SPI
-// mutex, failing every LTC6813 PEC read. 4096 is ~2.9x the measured peak, leaving room for the
-// paths that capture did not exercise (charging, fault handling, PEC-error reporting).
+// it peaks at 1304 bytes normally and 1336 in charge mode, and that overflow corrupted the RTOS
+// memory holding the SPI mutex, failing every LTC6813 PEC read. 4096 is ~3x the measured peak,
+// leaving room for the paths that capture did not exercise (fault handling, PEC-error reporting).
 // Re-measure with print_stack_stats() before trimming this further.
 #ifndef BMS_THREAD_STACK_SIZE
 #define BMS_THREAD_STACK_SIZE 4096
@@ -57,6 +57,17 @@
 // data stream.
 #ifndef PRINT_STACK_STATS
 #define PRINT_STACK_STATS 1
+#endif
+
+// Depth of the CAN receive queue, in frames. The main loop drains it once per MAIN_PERIOD,
+// so this sets the frame rate the car can absorb: depth / (MAIN_PERIOD/1000) frames per
+// second. The old depth of 32 gave 640 frames/s, which is ample for the handful of IDs used
+// today but nowhere near a fully forwarded 500 kbit bus (several thousand frames/s). 512
+// gives 10,240 frames/s, which covers back-to-back minimum-length frames.
+//
+// Costs 512 * 20 = 10 KB, allocated out of the otherwise unused AHB SRAM bank. See CanRx.h.
+#ifndef CAN_RX_QUEUE_DEPTH
+#define CAN_RX_QUEUE_DEPTH 512
 #endif
 
 // Delay in ms before zeroing current sensor and closing contactors

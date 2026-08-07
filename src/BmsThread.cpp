@@ -13,6 +13,7 @@
 
 #include "config.h"
 #include "pinout.h"
+#include "CanRx.h"
 #include "LTC6813.h"
 #include "LTC681xBus.h"
 #include "Data.h"
@@ -143,7 +144,9 @@ void BMSThread::threadWorker() {
   for (uint16_t i = 0; i < NUM_CHIPS; i++) {
     std::cout << ",dieTemp_" << (char)('A'+(i/2)) << (i%2)+1;
   }
-  std::cout << ",hsTemp,numBalancing,errCount\n";
+  // The four canRx* fields instrument the CAN receive path; all four should stay at 0. See
+  // CanRx.h for what each one means and which half of the path it covers.
+  std::cout << ",hsTemp,numBalancing,errCount,canDrop,canOvr,canQPeak,canLatUs\n";
 
   //serial->printf(printbuff.str().c_str());
   /*std::cout << printbuff.str();
@@ -721,6 +724,10 @@ void BMSThread::threadWorker() {
         std::cout << ',' << (int)m_inverterdata.heatsinktemp;
         std::cout << ',' << (int)m_batterydata.numBalancing;
         std::cout << ',' << (int)errCount;
+        std::cout << ',' << (unsigned long)canRxSwDrops;
+        std::cout << ',' << (unsigned long)canRxHwOverruns;
+        std::cout << ',' << (unsigned long)canRxQueuePeak;
+        std::cout << ',' << (unsigned long)canRxMaxLatencyUs;
         std::cout << '\n';
         //uint32_t curtime = t.read_us();
 

@@ -60,6 +60,28 @@ public:
     {
         return can_read(&_can, &msg, handle);
     }
+
+    /*
+     * Clear the peripheral's Data Overrun Status flag. Call this from a CAN::DoIrq handler.
+     *
+     * Per UM10360 (LPC176x/5x user manual): the Data Overrun Interrupt in ICR is set on the
+     * 0 -> 1 transition of the Data Overrun Status bit in SR/GSR, and DOS is cleared only by
+     * writing the Clear Data Overrun command, CMR bit 3. Reading ICR -- which can_irq_n()
+     * does before dispatching -- clears the interrupt flag but not DOS. So without this call
+     * DOS latches after the first overrun, no further 0 -> 1 transition can occur, and the
+     * counter would read 1 forever no matter how many frames were actually lost. Nothing in
+     * mbed-os writes CMR bit 3 anywhere, which is why this has to live here.
+     *
+     * Reaching _can.dev makes this LPC17xx-specific, unlike readNoLock() above. That is fine
+     * for this project but is the line to fix first if it is ever ported.
+     *
+     * NOT YET OBSERVED ON HARDWARE -- an overrun has never been provoked on this car. The
+     * register semantics above are from the manual, not from a measurement.
+     */
+    void clearDataOverrun()
+    {
+        _can.dev->CMR = (1 << 3);
+    }
 };
 
 #endif // ISR_SAFE_CAN_H

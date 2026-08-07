@@ -17,6 +17,8 @@
 
 #include "MCP23017.h"
 
+#include "CanRx.h"
+
 #include "MovingAverage.h"
 
 #define CAN_RX_INT_FLAG             (1UL << 0)
@@ -60,6 +62,7 @@ void tach_update();
 void print_cpu_stats();
 void print_stack_stats();
 void canRX();
+void canOverrun();
 void processCAN();
 void sendChargerInfo();
 
@@ -68,7 +71,15 @@ uint8_t tachcount = 0;
 
 CANMessage canmsg;
 
-CircularBuffer<CANMessage, 32> canqueue;
+// Definitions for the externs in CanRx.h; see that file for why this lives in AHB SRAM and
+// what each counter means.
+__attribute__((section("AHBSRAM")))
+CircularBuffer<TimestampedCANMessage, CAN_RX_QUEUE_DEPTH> canqueue;
+
+volatile uint32_t canRxSwDrops = 0;
+volatile uint32_t canRxHwOverruns = 0;
+volatile uint32_t canRxQueuePeak = 0;
+volatile uint32_t canRxMaxLatencyUs = 0;
 
 EventFlags eventFlags;
 //EventQueue CANqueue(4 * EVENTS_EVENT_SIZE);
@@ -178,6 +189,8 @@ int main() {
       //canBus->attach(CANqueue.event(processCAN));
       //canBus->filter(1, 0, CANStandard, 0);
       canBus->attach(canRX);
+      // Separate _irq[] slot per type, so this does not disturb the receive handler above.
+      canBus->attach(canOverrun, CAN::DoIrq);
 
       //std::cout << "Started CAN stuff\n";
       //ThisThread::sleep_for(40);
@@ -186,8 +199,17 @@ int main() {
     }
 
     while (!canqueue.empty()) {
-        CANMessage msg;
-        canqueue.pop(msg);
+        TimestampedCANMessage entry;
+        canqueue.pop(entry);
+        const CANMessage &msg = entry.msg;
+
+        // How long this frame waited between the ISR and here. Unsigned subtraction, so the
+        // ~71.6 minute wrap of us_ticker_read() is handled without a special case.
+        uint32_t latencyUs = us_ticker_read() - entry.rxTimeUs;
+        if (latencyUs > canRxMaxLatencyUs) {
+          canRxMaxLatencyUs = latencyUs;
+        }
+
         switch(msg.id) {
           case 1: 
             // Inverter data
@@ -364,13 +386,35 @@ void canRX() {
   //std::cout << "cc: " << (int)canCount << "\n";
   //CANqueue.call(canProcess);
   //canBus->read(canmsg);
-  CANMessage msg;
+  TimestampedCANMessage entry;
+
+  // Taken before the read so it reflects arrival rather than ISR latency, and so a frame
+  // read during a burst is not stamped with the time the burst finished.
+  entry.rxTimeUs = us_ticker_read();
 
   // readNoLock: canRX() is an ISR; CAN::read() would take a mutex here. See IsrSafeCAN.h.
-  if (canBus->readNoLock(msg)) {
-      canqueue.push(msg);
+  if (canBus->readNoLock(entry.msg)) {
+      // push() overwrites the oldest entry when full and reports nothing, so the only place
+      // a drop can be seen is right here, before it happens.
+      if (canqueue.full()) {
+          canRxSwDrops++;
+      }
+      canqueue.push(entry);
+
+      uint32_t depth = canqueue.size();
+      if (depth > canRxQueuePeak) {
+          canRxQueuePeak = depth;
+      }
   }
   //eventFlags.set(CAN_RX_INT_FLAG);
+}
+
+// CAN::DoIrq handler: a frame was lost inside the peripheral because the receive buffer was
+// still occupied. Clearing DOS is what keeps this counting past the first event; see
+// IsrSafeCAN::clearDataOverrun().
+void canOverrun() {
+  canRxHwOverruns++;
+  canBus->clearDataOverrun();
 }
 
 void sendChargerInfo() {
