@@ -973,6 +973,16 @@ void BMSThread::threadWorker() {
       std::cout << "BMS loop time: " << prevTime << "ms\n";
     }*/
 
+#if LINK_TEST && LINK_TEST_SATURATE
+    // Saturated link test: skip the pacing sleep so the transmitter is never left without
+    // work. This sleep is what puts an idle gap on the wire -- the TX buffer holds only 33 ms
+    // of data at 460800, so any pause longer than that lets the line go quiet, and the
+    // record-start corruption only ever appears on the first record after such a gap.
+    // Enlarging the TX buffer instead was tried and is not viable: it pushes IRAM1 to 88% and
+    // the firmware takes a BusFault running off the end of the heap.
+    ThisThread::yield();
+#else
     ThisThread::sleep_for(m_delay - (t.read_ms()%m_delay));
+#endif
   }
 }
