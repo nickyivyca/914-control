@@ -102,6 +102,22 @@
 #define LINK_TEST_CHUNK 0
 #endif
 
+// Drop the BMS thread's pacing sleep so the serial line never goes idle. Used to prove that
+// the single-byte insertions at record start need an idle gap: with this on, 31.7 MB produced
+// none at all, while the same build with the sleep intact produced 15 in 11.0 MB, 14 of them
+// on the first record after the gap.
+//
+// The gap is that sleep, not the display writes -- the display is a BufferedSerial whose
+// writes are far smaller than its buffer, so they never block. Bridging the gap with a bigger
+// TX buffer instead does not work: drivers.uart-serial-txbuf-size is shared with the display,
+// so 8192 buys two buffers, pushes IRAM1 to 88.2%, and the firmware takes a BusFault past the
+// end of the heap.
+//
+// Test builds only; it makes the BMS thread run flat out.
+#ifndef LINK_TEST_SATURATE
+#define LINK_TEST_SATURATE 0
+#endif
+
 // Even parity on the stdio UART. The host sets the same through the CDC line coding, which
 // the interface MCU applies to its own UART side. This does not report errors by itself --
 // the point is the comparison. If the corruption rate moves, the damage is happening on the
