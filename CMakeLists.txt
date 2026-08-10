@@ -26,13 +26,6 @@ include(mbed_project_setup)
 add_subdirectory(mbed-os)
 add_subdirectory(lib-mbed-ltc681x)
 
-# lib-mbed-ltc681x still links `mbed-os`, which was correct under mbed-tools but is
-# invalid under Mbed CE: mbed-os is an OBJECT library and may only be linked to
-# executables. Overriding here keeps the fix inside this repo so the submodule stays
-# pristine -- otherwise the patch would live only in a local working tree and be lost
-# on a fresh clone. Fold this upstream into lib-mbed-ltc681x and drop this block.
-set_property(TARGET lib-mbed-ltc681x PROPERTY LINK_LIBRARIES mbed-core-flags)
-
 # -Wno-register: mbed-os headers still use the `register` keyword, removed in C++17.
 # -Wno-deprecated-declarations: mbed-os deprecates APIs still used here.
 set(CMAKE_CXX_STANDARD 17)
