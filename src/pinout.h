@@ -152,6 +152,10 @@ extern CAN* canBus;
 #define PIN_ANALOG_KNOB2 p16
 #endif
 
+#ifndef PIN_ANALOG_KNOB3
+#define PIN_ANALOG_KNOB3 p20
+#endif
+
 extern DigitalOut* led1;
 extern DigitalOut* led2;
 extern DigitalOut* led3;
@@ -169,6 +173,8 @@ extern DigitalIn* DI_BrakeSwitch;
 extern DigitalIn* DI_ReverseSwitch;
 
 extern AnalogIn* knob1;
+extern AnalogIn* knob2;
+extern AnalogIn* knob3;
 
 extern MCP23017* ioexp;
 
@@ -199,6 +205,18 @@ extern PwmOut* fuelgauge;
 #define MCP_PIN_LOWFUEL 3
 #endif
 
+#ifndef MCP_PIN_KNOB1SW
+#define MCP_PIN_KNOB1SW 11
+#endif
+
+#ifndef MCP_PIN_KNOB2SW
+#define MCP_PIN_KNOB2SW 12
+#endif
+
 #ifndef MCP_BMS_THREAD_MASK
 #define MCP_BMS_THREAD_MASK MCP_PIN_BIT(MCP_PIN_LOWFUEL) | MCP_PIN_BIT(MCP_PIN_BMSERR) | MCP_PIN_BIT(MCP_PIN_EGR) | MCP_PIN_BIT(MCP_PIN_G)
+#endif
+
+#ifndef MCP_BMS_THREAD_READ_MASK
+#define MCP_BMS_THREAD_READ_MASK MCP_PIN_BIT(MCP_PIN_KNOB1SW) | MCP_PIN_BIT(MCP_PIN_KNOB2SW)
 #endif

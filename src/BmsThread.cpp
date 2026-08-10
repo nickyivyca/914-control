@@ -53,16 +53,35 @@ bool stringcheckOK = true;
 bool faultThrown = false;
 int millicoulombs;
 
+uint16_t gpiores;
+
+uint8_t soctarget;
+uint8_t chargerena;
+
 // char canPower[2];
 // char* const canPowerSend = canPower;
 
-union bytes {
+union inverterCANbytes {
     uint8_t bytes[8];
     uint32_t words[2];
     uint64_t bits;
 } inverterCAN;
 
+union chargerCAN102bytes {
+    uint8_t bytes[8];
+    uint32_t words[2];
+    uint64_t bits;
+} chargerCAN102;
+
+union chargerCAN103bytes {
+    uint8_t bytes[8];
+    uint32_t words[2];
+    uint64_t bits;
+} chargerCAN103;
+
 uint8_t* const inverterCANSend = inverterCAN.bytes;
+uint8_t* const chargerCAN102Send = chargerCAN102.bytes;
+uint8_t* const chargerCAN103Send = chargerCAN103.bytes;
 
 
 batterydata_t m_batterydata;
@@ -356,7 +375,7 @@ void BMSThread::threadWorker() {
 
 
     if (!pecStatus) {
-    //if (true) {
+    // if (true) {
       for (uint8_t i = 0; i < NUM_STRINGS; i++) {
         minTemps[tempSelect][i] = BMS_TEMPERATURE_THRESHOLD;
       }
@@ -674,6 +693,54 @@ void BMSThread::threadWorker() {
 
       canBus->write(CANMessage(0x3F, inverterCANSend, 8));
 
+      if (*DI_ChargeSwitch) {
+      //if (true) {
+        chargerCAN102.bits = 0;
+        chargerCAN103.bits = 0;
+        chargerCAN102.bytes[5] = (uint8_t)*DO_ChargeEnable;
+        chargerCAN102.bytes[3] = CHARGER_DC_SPNT;
+        chargerCAN102.bytes[6] = SoC;
+
+        gpiores = ioexp->read_mask(MCP_BMS_THREAD_READ_MASK);
+
+        soctarget = (100-(knob1->read_u16()/655));
+
+        uint16_t packtarget = (SoC_lookup[soctarget] * NUM_CELLS_PER_CHIP * NUM_CHIPS / NUM_STRINGS / 1000) - CHARGER_VSPNT_OFFSET;
+
+        if ( (MCP_PIN_BIT(MCP_PIN_KNOB1SW) & gpiores)) {
+          chargerCAN102.bytes[2] = (uint8_t)(CHARGER_VLIMIT>>8);
+          chargerCAN102.bytes[1] = (uint8_t)(CHARGER_VLIMIT&0xFF);
+          chargerCAN103.bytes[1] = (uint8_t)(packtarget>>8);
+          chargerCAN103.bytes[0] = (uint8_t)(packtarget&0xFF);
+        } else {
+          chargerCAN102.bytes[1] = (uint8_t)(packtarget>>8);
+          chargerCAN102.bytes[2] = (uint8_t)(packtarget&0xFF);
+          chargerCAN103.bytes[0] = (uint8_t)(CHARGER_VLIMIT>>8);
+          chargerCAN103.bytes[1] = (uint8_t)(CHARGER_VLIMIT&0xFF);
+        }
+
+        chargerena = 7;
+        chargerCAN103.bytes[2] = chargerena;
+
+        canBus->write(CANMessage(0x102, chargerCAN102Send, 8));
+        canBus->write(CANMessage(0x103, chargerCAN103Send, 8));
+
+        std::cout << "Soctarget: " << (int)soctarget << " Packtarget: " << packtarget << "Chargeenable: " << *DO_ChargeEnable << "\n";
+
+
+        std::cout << "chargerCAN102:\n";
+        for (int i = 0; i < 8; ++i) {
+          std::cout << (int)chargerCAN102.bytes[i] << " ";
+        }
+        std::cout << "\n";
+        std::cout << "chargerCAN103:\n";
+        for (int i = 0; i < 8; ++i) {
+          std::cout << (int)chargerCAN103.bytes[i] << " ";
+        }
+        std::cout << "\n";
+
+      }
+
       // std::cout << "CAN bytes: ";
       // for (int p = 0; p < 8; p++) {
 
@@ -707,9 +774,11 @@ void BMSThread::threadWorker() {
         /**msg = m_outbox->alloc();
         msg->msg_event = CHARGE_ENABLED;
         m_outbox->put(msg);*/
+        std::cout << "Enabling charging\n";
       } else {
         *DO_ChargeEnable = 0;
-        *led2 = 0;          
+        *led2 = 0;
+        std::cout << "Throwing charging fault ChargeSwitch: " << *DI_ChargeSwitch << " voltagecheck: " << voltagecheckOK << " faultthrown: " << faultThrown << "\n";
       }
 
 
@@ -805,7 +874,15 @@ void BMSThread::threadWorker() {
       //displayserial->putc(0x80); // move to 0,0
 
       if (*DI_ChargeSwitch) {
-        sprintf(&dispprint[1], "%3dV %2dA %3d", m_chargerdata.VAC, m_chargerdata.IAC, m_batterydata.numBalancing);
+      //if (true) {
+        char chargeterm[3];
+        if ( (MCP_PIN_BIT(MCP_PIN_KNOB1SW) & gpiores)) {
+          strcpy(chargeterm, "CC");
+        } else {
+          strcpy(chargeterm, "CV");
+        }
+
+        sprintf(&dispprint[1], "%3dV %2dA %3d %s%3u", (uint8_t)m_chargerdata.VAC, (uint8_t)m_chargerdata.IAC, m_batterydata.numBalancing, chargeterm, soctarget);
       } else {
         int64_t power = m_batterysummary.totalCurrent*((int64_t)m_batterysummary.totalVoltage)/1000000;
         // Guards display overflow

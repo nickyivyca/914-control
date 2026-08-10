@@ -45,6 +45,8 @@ DigitalIn* DI_BrakeSwitch;
 DigitalIn* DI_ReverseSwitch;
 
 AnalogIn* knob1;
+AnalogIn* knob2;
+AnalogIn* knob3;
 
 Mail<mail_t, MSG_QUEUE_SIZE> inbox_main;
 Mail<mail_t, MSG_QUEUE_SIZE> inbox_bms;
@@ -282,6 +284,8 @@ void initIO() {
   //tach->write(0.5);
 
   knob1 = new AnalogIn(PIN_ANALOG_KNOB1);
+  knob2 = new AnalogIn(PIN_ANALOG_KNOB2);
+  knob3 = new AnalogIn(PIN_ANALOG_KNOB3);
 
   *DO_Tach = 0;
   *DO_BattContactor = 0;

@@ -49,6 +49,23 @@
 
 
 
+// Voltage limit sent to charger over CAN
+#ifndef CHARGER_VLIMIT
+#define CHARGER_VLIMIT 346
+#endif
+
+// Offset in multiplied SoC value to CV value sent to charger
+#ifndef CHARGER_VSPNT_OFFSET
+#define CHARGER_VSPNT_OFFSET 0
+#endif
+
+// DC limit sent to charger
+#ifndef CHARGER_DC_SPNT
+#define CHARGER_DC_SPNT 30
+#endif
+
+
+
 // #ifndef TESTBALANCE
 // #define TESTBALANCE
 // #endif
