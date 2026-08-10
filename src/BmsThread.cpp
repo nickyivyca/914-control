@@ -848,7 +848,6 @@ void BMSThread::threadWorker() {
       << "\nPower: " << totalCurrent_scaled * (totalVoltage_scaled) / 1000.0 << "kW"  // scale to kW
       << "\nMax Cell: " << m_batterysummary.maxVoltage << " " << (char)('A'+(m_batterysummary.maxVoltage_cell/28)) << (m_batterysummary.maxVoltage_cell%28)+1
       << " Min Cell: " << m_batterysummary.minVoltage << " " << (char)('A'+(m_batterysummary.minVoltage_cell/28)) << (m_batterysummary.minVoltage_cell%28)+1
-      << " Avg Cell: " << m_batterysummary.totalVoltage/(NUM_CELLS_PER_CHIP*NUM_CHIPS)
       << "\nMax Temp: " << m_batterysummary.maxTemp << " " << (char)('A'+(m_batterysummary.maxTemp_box/2)) << (m_batterysummary.maxTemp_box%2)+1
       << " Min Temp: " << m_batterysummary.minTemp << " " << (char)('A'+(m_batterysummary.minTemp_box/2)) << (m_batterysummary.minTemp_box%2)+1;
       printbuff << "\n\n";
