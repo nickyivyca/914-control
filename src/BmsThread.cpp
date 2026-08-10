@@ -79,6 +79,31 @@ void BMSThread::throwBmsFault() {
   *led2 = 0;
   *led4 = 1;
 }
+
+// Maps full knob travel to a charger DC voltage setpoint spanning 20%-100% SoC.
+// Target per-cell voltage comes from SoC_lookup (indexed by SoC%, in mV); the pack
+// setpoint is that times the series cell count. Sent to the Tesla charger on CAN 0x103,
+// where it is mapped to udcspnt (bytes 0-1, little-endian, volts).
+void BMSThread::sendChargerSetpoint() {
+  float socf = 20.0f + knob1->read() * 80.0f;   // 20%..100% SoC across knob travel
+  if (socf < 20.0f) socf = 20.0f;
+  if (socf > 100.0f) socf = 100.0f;
+
+  int i = (int)socf;
+  float frac = socf - i;
+  if (i >= 100) { i = 100; frac = 0.0f; }        // top out at SoC_lookup[100], never index 101
+
+  float cellmv = SoC_lookup[i] + frac * (SoC_lookup[i + 1] - SoC_lookup[i]);
+  uint16_t setpoint = (uint16_t)(cellmv * SERIES_CELLS / 1000.0f + 0.5f);
+
+  uint8_t buf[3];
+  buf[0] = setpoint & 0xFF;
+  buf[1] = (setpoint >> 8) & 0xFF;
+  buf[2] = 0;   // chargerena: 0 is out of range (min 1), so the charger rejects it and keeps its value
+
+  canBus->write(CANMessage(0x103, buf, 3));
+}
+
 void BMSThread::threadWorker() {
 
 #ifdef TESTBALANCE
@@ -674,6 +699,8 @@ void BMSThread::threadWorker() {
         msg->msg_event = BATT_STARTUP;
         m_outbox->put(msg);*/
       }
+      sendChargerSetpoint();
+
       if (*DI_ChargeSwitch && voltagecheckOK && !faultThrown) {
         *DO_ChargeEnable = 1;
         *led2 = 1;

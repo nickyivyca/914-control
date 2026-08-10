@@ -62,6 +62,9 @@
 #define NUM_CELLS_PER_CHIP 14
 #endif
 
+// Series cell count of the pack. Strings are paralleled, so one string's series count is the pack's.
+#define SERIES_CELLS (NUM_CHIPS / NUM_STRINGS * NUM_CELLS_PER_CHIP)
+
 // Mapping of BMS chip channels to cells
 const int8_t BMS_CELL_MAP[18] = {0, 1, 2, 3, 4, -1, 5, 6, 7, 8, 9, -1, 10, 11, 12, 13, -1, -1};
 

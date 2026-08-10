@@ -52,5 +52,6 @@ class BMSThread {
 
   void throwBmsFault();
   void threadWorker();
+  void sendChargerSetpoint();
 
 };
