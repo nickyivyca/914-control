@@ -99,6 +99,18 @@ void BMSThread::throwBmsFault() {
   *led4 = 1;
 }
 
+// !!! CONFLICTS WITH THE INLINE CHARGER BLOCK IN threadWorker() -- both write CAN 0x103 !!!
+// Two independent implementations of charger control live on this branch and both are active.
+// They disagree in four ways. Pick one before running this against a real charger:
+//
+//   0x103 length    3 bytes here, 8 bytes in the inline block
+//   chargerena      0 here (deliberately out of range so the charger keeps its value),
+//                   7 in the inline block
+//   knob direction  increasing knob raises SoC here; the inline block computes
+//                   100 - read_u16()/655, so increasing knob *lowers* SoC
+//   gating          this is called unconditionally, even when not charging; the inline
+//                   block only runs while *DI_ChargeSwitch
+//
 // Maps full knob travel to a charger DC voltage setpoint spanning 20%-100% SoC.
 // Target per-cell voltage comes from SoC_lookup (indexed by SoC%, in mV); the pack
 // setpoint is that times the series cell count. Sent to the Tesla charger on CAN 0x103,
@@ -693,6 +705,16 @@ void BMSThread::threadWorker() {
 
       canBus->write(CANMessage(0x3F, inverterCANSend, 8));
 
+      // !!! CONFLICTS WITH sendChargerSetpoint() ABOVE -- both write CAN 0x103 !!!
+      // See the comment on that function for the four ways the two implementations disagree.
+      // While charging, both fire every BMS cycle and the charger sees two different 0x103
+      // frames with different lengths.
+      //
+      // Also: the CC and CV branches below pack their fields with OPPOSITE byte order.
+      // CC writes 103 as [0]=low [1]=high, CV writes it as [0]=high [1]=low, and 102 is
+      // reversed between the branches the same way. Only one can be right, and
+      // sendChargerSetpoint() documents 0x103 udcspnt as little-endian, which matches CC.
+      // The CV branch looks wrong.
       if (*DI_ChargeSwitch) {
       //if (true) {
         chargerCAN102.bits = 0;
