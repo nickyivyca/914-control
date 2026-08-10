@@ -14,11 +14,44 @@
 #include "config.h"
 #include "pinout.h"
 #include "CanRx.h"
+#include "Slcan.h"
 #include "LTC6813.h"
 #include "LTC681xBus.h"
 #include "Data.h"
 #include "BmsThread.h"
 
+
+#if SLCAN_MODE
+/*
+ * Synthetic telemetry as CAN frames.
+ *
+ * With SLCAN_VERIFY_PATTERN the payload is a deterministic function of a free-running frame
+ * counter rather than real cell data. The counter travels in the frame, so every frame is
+ * self-identifying and self-verifying: a gap in the counters is a lost frame, and a payload
+ * that does not match its own counter is corruption that got past the structural check. Those
+ * two numbers are the point of the prototype and neither can be measured from real telemetry,
+ * because there is nothing to compare a plausible-looking cell voltage against.
+ *
+ * The channel id cycles so the stream exercises a spread of IDs the way real telemetry will,
+ * rather than hammering one.
+ */
+static void slcan_emit_synthetic(uint32_t counter)
+{
+    uint8_t payload[8];
+#if SLCAN_VERIFY_PATTERN
+    payload[0] = (uint8_t)(counter >> 8);
+    payload[1] = (uint8_t)(counter & 0xFF);
+    for (int i = 2; i < 8; i++) {
+        payload[i] = (uint8_t)((counter * 7u + i) & 0xFF);
+    }
+#else
+    for (int i = 0; i < 8; i++) {
+        payload[i] = 0;
+    }
+#endif
+    slcan_emit(SLCAN_SYNTH_BASE | (counter & 0x3F), payload, 8, true);
+}
+#endif // SLCAN_MODE
 
 #if LINK_TEST
 /*
@@ -170,6 +203,11 @@ void BMSThread::threadWorker() {
   serial->format(8, SerialBase::Even, 1);
 #endif
 
+#if SLCAN_MODE
+  // No CSV header in SLCAN mode: a line of text in the stream is not a valid frame, and the
+  // host would have to special-case it to avoid counting it as corruption.
+  slcan_init();
+#else
   // Print CSV header
   std::cout << "time_millis,packVoltage";
   for (uint16_t i = 0; i < NUM_STRINGS; i++) {
@@ -200,6 +238,7 @@ void BMSThread::threadWorker() {
   // The four canRx* fields instrument the CAN receive path; all four should stay at 0. See
   // CanRx.h for what each one means and which half of the path it covers.
   std::cout << ",hsTemp,numBalancing,errCount,canDrop,canOvr,canQPeak,canLatUs\n";
+#endif // SLCAN_MODE
 
   //serial->printf(printbuff.str().c_str());
   /*std::cout << printbuff.str();
@@ -755,7 +794,19 @@ void BMSThread::threadWorker() {
         // notes/plans/vcu-logging-refactor.md in the 914 notes repo.
         uint32_t printStartUs = us_ticker_read();
 #endif
-#if LINK_TEST
+#if SLCAN_MODE
+        {
+          static uint32_t slcanCounter = 0;
+          static uint16_t sinceSeq = 0;
+          for (uint16_t k = 0; k < SLCAN_FRAMES_PER_CYCLE; k++) {
+            slcan_emit_synthetic(slcanCounter++);
+            if (++sinceSeq >= SLCAN_SEQ_INTERVAL) {
+              sinceSeq = 0;
+              slcan_emit_sequence();
+            }
+          }
+        }
+#elif LINK_TEST
         {
           static uint32_t linkTestSeq = 0;
           for (uint16_t k = 0; k < LINK_TEST_LINES_PER_PRINT; k++) {
@@ -802,7 +853,7 @@ void BMSThread::threadWorker() {
         std::cout << ',' << (unsigned long)canRxMaxLatencyUs;
         canRxMaxLatencyUs = 0;
         std::cout << '\n';
-#endif // LINK_TEST
+#endif // SLCAN_MODE / LINK_TEST
 
 #if PRINT_TIMING
         // Timed before the report below is emitted, so the report is not in its own numbers.

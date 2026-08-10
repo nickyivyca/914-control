@@ -118,6 +118,41 @@
 #define LINK_TEST_SATURATE 0
 #endif
 
+// Emit telemetry as SLCAN (LAWICEL ASCII) CAN frames instead of the CSV. See Slcan.h for the
+// format, the 11-bit/29-bit split between real and synthetic frames, and why an integrity
+// frame is needed on top.
+#ifndef SLCAN_MODE
+#define SLCAN_MODE 0
+#endif
+
+// Synthetic frames emitted per BMS cycle. Real telemetry is ~51 frames per scan -- 168 cell
+// voltages at 4 per frame, plus temperatures, die temperatures and summary -- so 51 is the
+// realistic figure. Raise it to gather link statistics faster than real time.
+#ifndef SLCAN_FRAMES_PER_CYCLE
+#define SLCAN_FRAMES_PER_CYCLE 51
+#endif
+
+// Frames between integrity frames. Smaller costs more overhead but discards less data when a
+// block fails its CRC: at 16 frames a failure loses about 450 bytes, roughly a third of one
+// scan, instead of the whole thing.
+#ifndef SLCAN_SEQ_INTERVAL
+#define SLCAN_SEQ_INTERVAL 16
+#endif
+
+// Forward real vehicle bus traffic as standard-ID frames, i.e. actually act as the CAN proxy.
+#ifndef SLCAN_FORWARD_CAN
+#define SLCAN_FORWARD_CAN 1
+#endif
+
+// Fill synthetic payloads with a deterministic function of a frame counter so the host can
+// verify every byte. This is what separates three outcomes that otherwise look identical in a
+// log: frames that never arrived, frames rejected as malformed, and frames that arrived
+// well-formed carrying wrong data. The last of those -- corruption that passes the structural
+// check -- is the number this prototype exists to measure, and real telemetry cannot yield it.
+#ifndef SLCAN_VERIFY_PATTERN
+#define SLCAN_VERIFY_PATTERN 1
+#endif
+
 // Even parity on the stdio UART. The host sets the same through the CDC line coding, which
 // the interface MCU applies to its own UART side. This does not report errors by itself --
 // the point is the comparison. If the corruption rate moves, the damage is happening on the

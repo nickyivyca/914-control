@@ -19,6 +19,8 @@
 
 #include "CanRx.h"
 
+#include "Slcan.h"
+
 #include "MovingAverage.h"
 
 #define CAN_RX_INT_FLAG             (1UL << 0)
@@ -210,8 +212,16 @@ int main() {
           canRxMaxLatencyUs = latencyUs;
         }
 
+#if SLCAN_MODE && SLCAN_FORWARD_CAN
+        // Forward real bus traffic as a standard-ID frame. Emitted from the main loop while
+        // telemetry comes from the BMS thread, which is exactly the two-writer situation that
+        // put `ERR:` messages inside CSV rows in the 2021 logs -- slcan_emit() takes a mutex
+        // and writes each frame in one call to keep frames whole.
+        slcan_emit(msg.id, msg.data, msg.len, msg.format == CANExtended);
+#endif
+
         switch(msg.id) {
-          case 1: 
+          case 1:
             // Inverter data
             {
               //printf("ID: %X %d %d\n", msg.id, msg.data[4], msg.data[5]);
