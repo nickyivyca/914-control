@@ -33,6 +33,25 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-register -Wno-deprecated-declaratio
 
 add_executable(${APP_TARGET})
 
+# Override src/config.h knobs at configure time instead of editing the file:
+#
+#   cmake -S . -B build-slcan ... -DCONFIG_DEFINES="SLCAN_MODE=1;SLCAN_DUAL_EMIT=1"
+#
+# Every knob in config.h is #ifndef-guarded, so a -D wins. Use this rather than editing
+# config.h for an experiment: an edited config.h is one `git checkout` away from silently
+# reverting mid-session, which has already cost one round of measurements here, and the build
+# directory records which configuration produced which binary.
+#
+# Note this must NOT be done by passing -DCMAKE_CXX_FLAGS on the command line: that replaces the
+# cache value the Mbed CE toolchain setup put there, taking -mcpu/-mthumb with it, and the build
+# fails deep inside CMSIS with "Unknown Arm architecture profile".
+set(CONFIG_DEFINES "" CACHE STRING
+    "Semicolon-separated src/config.h overrides, e.g. SLCAN_MODE=1;SLCAN_DUAL_EMIT=1")
+if(CONFIG_DEFINES)
+    target_compile_definitions(${APP_TARGET} PRIVATE ${CONFIG_DEFINES})
+    message(STATUS "914-control config overrides: ${CONFIG_DEFINES}")
+endif()
+
 target_sources(${APP_TARGET}
     PRIVATE
         src/Main.cpp

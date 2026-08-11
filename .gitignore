@@ -103,3 +103,6 @@ DELIVERY/
 .mbedbuild
 cmake_build/
 build/
+# Additional CMake build trees for config variants, e.g.
+#   cmake -S . -B build-slcan ... -DCONFIG_DEFINES="SLCAN_MODE=1"
+build-*/
