@@ -20,6 +20,7 @@
 #include "CanRx.h"
 
 #include "Slcan.h"
+#include "Telemetry.h"
 
 #include "MovingAverage.h"
 
@@ -130,7 +131,14 @@ int main() {
   BMSThread bmsThread(&inbox_main, &inbox_bms_charger, &inbox_bms_inverter, &ltcBus, &ltc6813Bus);
   osStatus bmsStartStatus = bmsThreadThread.start(callback(&BMSThread::startThread, &bmsThread));
   if (bmsStartStatus != osOK) {
+#if SLCAN_MODE
+    // Emitted before slcan_init() runs in the BMS thread -- which by definition never happens
+    // if we are here. The frame is well formed regardless; the block counters simply start
+    // from whatever they were.
+    telemetry_emit_diag(BMS_DIAG_THREAD_START, (uint16_t)bmsStartStatus, 0, 0);
+#else
     std::cout << "FATAL: BMS thread failed to start, status " << bmsStartStatus << std::endl;
+#endif
   }
   Thread CANThread(osPriorityAboveNormal, 512);
 
@@ -157,7 +165,9 @@ int main() {
 
         switch(msg->msg_event) {
           case INIT_ALL:
+#if !SLCAN_MODE
             std::cout << "Main thread init\n";
+#endif
             break;
           case NEW_CELL_DATA:
             break;
@@ -169,7 +179,11 @@ int main() {
             }
             break;
           default:
+#if SLCAN_MODE
+            telemetry_emit_diag(BMS_DIAG_INVALID_MESSAGE, 3, (uint16_t)msg->msg_event, 0);
+#else
             std::cout << "Invalid message received in Main thread!\n";
+#endif
             break;
         }
         inbox_main.free(msg);

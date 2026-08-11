@@ -15,6 +15,7 @@
 #include "LTC6813.h"
 #include "LTC681xBus.h"
 #include "Data.h"
+#include "Telemetry.h"
 
 class BMSThread {
  public:
@@ -50,7 +51,14 @@ class BMSThread {
   LTC681xBus* m_bus;
   LTC6813Bus* m_6813bus;
 
-  void throwBmsFault();
+  // Every fault now names itself. The bit feeds both halves of the BmsStatus telemetry frame --
+  // a latched byte and a this-cycle byte -- which is what makes it visible when a single-cycle
+  // sag half-throttles the car via the latched path while the dash lamp only flickers.
+  //
+  // This does not yet replace voltagecheckOK / stringcheckOK / faultThrown. Those carry latch
+  // semantics that feed the inverter's throttle limit, so unpicking them is a separate change
+  // from making the faults observable.
+  void throwBmsFault(BmsFaultBit fault);
   void threadWorker();
 
 };

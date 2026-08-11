@@ -120,14 +120,60 @@
 
 // Emit telemetry as SLCAN (LAWICEL ASCII) CAN frames instead of the CSV. See Slcan.h for the
 // format, the 11-bit/29-bit split between real and synthetic frames, and why an integrity
-// frame is needed on top.
+// frame is needed on top; see Telemetry.h for the ID map itself.
+//
+// Off by default. Turning it on changes the logging format the car produces, and the map has
+// not yet been checked against the CSV on the car -- do that with SLCAN_DUAL_EMIT first.
 #ifndef SLCAN_MODE
 #define SLCAN_MODE 0
 #endif
 
-// Synthetic frames emitted per BMS cycle. Real telemetry is ~51 frames per scan -- 168 cell
-// voltages at 4 per frame, plus temperatures, die temperatures and summary -- so 51 is the
-// realistic figure. Raise it to gather link statistics faster than real time.
+// Emit the CSV record as well as the SLCAN frames. This is the dual-emit verification build:
+// decode the SLCAN stream, diff it field-for-field against the CSV from the same run, and every
+// scale factor, byte order and index mapping in the map is validated at once against a
+// known-good reference. It is the single strongest check available without extra equipment.
+//
+// The CSV is written while holding the frame lock, so it cannot be spliced into a frame. Its
+// bytes are not accumulated into the block CRC, so the host must exclude non-frame lines when
+// checking the integrity frame.
+//
+// Costs roughly double the link bandwidth. Not a mode to leave on.
+#ifndef SLCAN_DUAL_EMIT
+#define SLCAN_DUAL_EMIT 0
+#endif
+
+// Whether the CSV is emitted at all. The link test replaces the serial payload entirely, and
+// SLCAN mode replaces it unless dual-emit is asked for.
+#define EMIT_CSV (!LINK_TEST && (!SLCAN_MODE || SLCAN_DUAL_EMIT))
+
+// Read the MCP23017 input side once per scan and mirror port B into byte 7 of the BmsStatus
+// frame. Off on mainline: nothing here reads the input pins, the knob switches exist only on
+// the charge-control branch, and an I2C read per scan for a byte nobody populates is not worth
+// the bus time. The byte is reserved in the map either way, so that branch can turn this on
+// without renumbering anything.
+//
+// Note that a transmitted 0 is indistinguishable from "no switch pressed" -- use the firmware
+// version to tell the two apart.
+#ifndef TELEMETRY_READ_GPIO_INPUTS
+#define TELEMETRY_READ_GPIO_INPUTS 0
+#endif
+
+// Replace real telemetry with a deterministic function of a free-running frame counter. This is
+// the link instrument, not a telemetry mode: it is what separates three outcomes that look
+// identical in a log -- frames that never arrived, frames rejected as malformed, and frames
+// that arrived well formed carrying wrong data. The last of those cannot be measured from real
+// telemetry, because there is nothing to compare a plausible-looking cell voltage against.
+//
+// Defaulted off now that the real map is implemented; it was on while the map was still a
+// counter pattern and the only question was whether the transport held up.
+#ifndef SLCAN_VERIFY_PATTERN
+#define SLCAN_VERIFY_PATTERN 0
+#endif
+
+// Test-pattern frames emitted per BMS cycle, when SLCAN_VERIFY_PATTERN is on. Real telemetry is
+// ~51 frames per logging scan -- 168 cell voltages at 4 per frame, plus temperatures, die
+// temperatures, link health and the balancing mask -- so 51 matches it. Raise it to gather link
+// statistics faster than real time.
 #ifndef SLCAN_FRAMES_PER_CYCLE
 #define SLCAN_FRAMES_PER_CYCLE 51
 #endif
@@ -142,15 +188,6 @@
 // Forward real vehicle bus traffic as standard-ID frames, i.e. actually act as the CAN proxy.
 #ifndef SLCAN_FORWARD_CAN
 #define SLCAN_FORWARD_CAN 1
-#endif
-
-// Fill synthetic payloads with a deterministic function of a frame counter so the host can
-// verify every byte. This is what separates three outcomes that otherwise look identical in a
-// log: frames that never arrived, frames rejected as malformed, and frames that arrived
-// well-formed carrying wrong data. The last of those -- corruption that passes the structural
-// check -- is the number this prototype exists to measure, and real telemetry cannot yield it.
-#ifndef SLCAN_VERIFY_PATTERN
-#define SLCAN_VERIFY_PATTERN 1
 #endif
 
 // Even parity on the stdio UART. The host sets the same through the CDC line coding, which

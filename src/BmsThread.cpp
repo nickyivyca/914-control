@@ -6,7 +6,8 @@
 #include <bitset>
 #include <string>
 #include <sstream>
-#include <iomanip> 
+#include <iomanip>
+#include <string.h>
 
 #include "mbed.h"
 #include "rtos.h"
@@ -18,40 +19,36 @@
 #include "LTC6813.h"
 #include "LTC681xBus.h"
 #include "Data.h"
+#include "Telemetry.h"
 #include "BmsThread.h"
 
 
-#if SLCAN_MODE
+#if SLCAN_MODE && SLCAN_VERIFY_PATTERN
 /*
- * Synthetic telemetry as CAN frames.
+ * The link instrument: a deterministic function of a free-running frame counter, in place of
+ * the real slow tier.
  *
- * With SLCAN_VERIFY_PATTERN the payload is a deterministic function of a free-running frame
- * counter rather than real cell data. The counter travels in the frame, so every frame is
- * self-identifying and self-verifying: a gap in the counters is a lost frame, and a payload
- * that does not match its own counter is corruption that got past the structural check. Those
- * two numbers are the point of the prototype and neither can be measured from real telemetry,
- * because there is nothing to compare a plausible-looking cell voltage against.
+ * The counter travels in the frame, so every frame is self-identifying and self-verifying: a
+ * gap in the counters is a lost frame, and a payload that does not match its own counter is
+ * corruption that got past the structural check. Those two numbers are what this exists to
+ * measure and neither can be had from real telemetry, because there is nothing to compare a
+ * plausible-looking cell voltage against.
  *
- * The channel id cycles so the stream exercises a spread of IDs the way real telemetry will,
- * rather than hammering one.
+ * The channel id cycles so the stream exercises a spread of IDs the way real telemetry does,
+ * rather than hammering one. Note that the ids it walks over DO overlap the real map -- this
+ * is a bench mode, and a capture taken with it on is not telemetry.
  */
 static void slcan_emit_synthetic(uint32_t counter)
 {
     uint8_t payload[8];
-#if SLCAN_VERIFY_PATTERN
     payload[0] = (uint8_t)(counter >> 8);
     payload[1] = (uint8_t)(counter & 0xFF);
     for (int i = 2; i < 8; i++) {
         payload[i] = (uint8_t)((counter * 7u + i) & 0xFF);
     }
-#else
-    for (int i = 0; i < 8; i++) {
-        payload[i] = 0;
-    }
-#endif
     slcan_emit(SLCAN_SYNTH_BASE | (counter & 0x3F), payload, 8, true);
 }
-#endif // SLCAN_MODE
+#endif // SLCAN_MODE && SLCAN_VERIFY_PATTERN
 
 #if LINK_TEST
 /*
@@ -130,6 +127,27 @@ bool stringcheckOK = true;
 bool faultThrown = false;
 int millicoulombs;
 
+// Fault state as bit sets over BmsFaultBit. `Now` is rebuilt from scratch every scan; `Latched`
+// only ever gains bits, and like faultThrown it clears on reset alone. Both are transmitted,
+// because they diverge: a fault that appears for one scan and clears leaves the latched byte
+// set for the rest of the drive, and the latched byte is what the throttle limit follows.
+uint8_t faultBitsNow = 0;
+uint8_t faultBitsLatched = 0;
+
+// Record a fault without taking any action. Used where the existing code sets a flag or a dash
+// light but deliberately does not call throwBmsFault() -- string imbalance and PEC failures --
+// so that observing the fault does not change what the car does.
+static inline void setFault(BmsFaultBit fault) {
+  faultBitsNow |= (uint8_t)(1u << fault);
+  faultBitsLatched |= (uint8_t)(1u << fault);
+}
+
+// Set the balancing bit for a flat cell index. Bit n of byte b is cell b*8+n, matching both the
+// DBC and the ordering of allVoltages.
+static inline void markBalancing(batterydata_t &d, uint8_t cellIndex) {
+  d.balanceMask[cellIndex >> 3] |= (uint8_t)(1u << (cellIndex & 7));
+}
+
 // char canPower[2];
 // char* const canPowerSend = canPower;
 
@@ -149,7 +167,8 @@ chargerdata_t m_chargerdata;
 inverterdata_t m_inverterdata;
 
 
-void BMSThread::throwBmsFault() {
+void BMSThread::throwBmsFault(BmsFaultBit fault) {
+  setFault(fault);
   m_discharging = false;
   *DO_ChargeEnable = 0;
   faultThrown = true;
@@ -204,10 +223,15 @@ void BMSThread::threadWorker() {
 #endif
 
 #if SLCAN_MODE
-  // No CSV header in SLCAN mode: a line of text in the stream is not a valid frame, and the
-  // host would have to special-case it to avoid counting it as corruption.
   slcan_init();
-#else
+#endif
+
+// No CSV header in SLCAN mode: a line of text in the stream is not a valid frame, and the host
+// would have to special-case it to avoid counting it as corruption. Dual-emit already requires
+// the host to skip non-frame lines, so the header comes back there. Deliberately not EMIT_CSV,
+// which is false under LINK_TEST -- the link test has always printed this header first and the
+// archived captures start with it.
+#if !SLCAN_MODE || SLCAN_DUAL_EMIT
   // Print CSV header
   std::cout << "time_millis,packVoltage";
   for (uint16_t i = 0; i < NUM_STRINGS; i++) {
@@ -238,7 +262,7 @@ void BMSThread::threadWorker() {
   // The four canRx* fields instrument the CAN receive path; all four should stay at 0. See
   // CanRx.h for what each one means and which half of the path it covers.
   std::cout << ",hsTemp,numBalancing,errCount,canDrop,canOvr,canQPeak,canLatUs\n";
-#endif // SLCAN_MODE
+#endif // !SLCAN_MODE || SLCAN_DUAL_EMIT
 
   //serial->printf(printbuff.str().c_str());
   /*std::cout << printbuff.str();
@@ -310,10 +334,23 @@ void BMSThread::threadWorker() {
     //stringCurrents[NUM_STRINGS] = 0;
     m_batterydata.numBalancing = 0;
     m_batterydata.totalCurrent = 0;
+    // Cleared beside numBalancing so the mask and the count can only ever describe the same
+    // scan; verification 1 in the ID allocation is that popcount(mask) == numBalancing.
+    memset(m_batterydata.balanceMask, 0, sizeof(m_batterydata.balanceMask));
+
+    // Rebuilt every scan. The latched copy is not touched here -- that is the point of it.
+    faultBitsNow = 0;
 
     uint16_t ioexp_bits = 0;
 
     uint32_t timestamp = 0;
+
+    // Whether this scan is the one that logs. Computed up front because the die-temperature
+    // read is now gated on it, and that happens long before printCount is advanced.
+    //
+    // Deliberately mirrors `++printCount == CELL_PRINT_MULTIPLE` exactly, including the
+    // documented CELL_PRINT_MULTIPLE == 0 case, where the comparison is against a 16-bit wrap.
+    const bool loggingScan = ((uint16_t)(printCount + 1) == CELL_PRINT_MULTIPLE);
 
     
     while(!m_inbox_inverter->empty()) {
@@ -325,7 +362,14 @@ void BMSThread::threadWorker() {
         m_inverterdata = *msg;
         m_inbox_inverter->free(msg);
       } else {
+        // Was a bare line printed into the data stream, which lands in the middle of whatever
+        // record is being written -- the mechanism behind 5,099 broken rows in the archive.
+        // A coded frame carries the same information and cannot damage a data frame.
+#if SLCAN_MODE
+        telemetry_emit_diag(BMS_DIAG_INVALID_MESSAGE, 1, (uint16_t)evt.status, 0);
+#else
         std::cout << "Invalid inverter data received\n";
+#endif
       }
     }
     while(!m_inbox_charger->empty()) {
@@ -337,7 +381,11 @@ void BMSThread::threadWorker() {
         m_chargerdata = *msg;
         m_inbox_charger->free(msg);
       } else {
+#if SLCAN_MODE
+        telemetry_emit_diag(BMS_DIAG_INVALID_MESSAGE, 2, (uint16_t)evt.status, 0);
+#else
         std::cout << "Invalid charger data received\n";
+#endif
       }
     }
 
@@ -400,7 +448,17 @@ void BMSThread::threadWorker() {
     uint8_t pecStatus = m_6813bus->getCombined(voltages, gpio_adc);
     timestamp = t.read_ms();
     m_6813bus->unmuteDischarge();
-    if (*DI_ChargeSwitch) {
+    // Read on the logging scan only, and regardless of the charge switch.
+    //
+    // It used to run every scan but was only ever logged on the print interval, so four reads
+    // in five were thrown away -- getDieTemps() is self-contained (it starts its own ITMP
+    // conversion, polls it and reads Status Group A), so it can be gated freely.
+    //
+    // Dropping the charge-switch gate is a behaviour change: die temperatures are now recorded
+    // while driving, where the CSV previously left the columns empty. It assumes the aux
+    // reading is valid outside charging, which has not been confirmed on the car -- that is
+    // verification 11 in the ID allocation.
+    if (loggingScan) {
       m_6813bus->getDieTemps(m_batterydata.dieTemps);
     }
 
@@ -478,13 +536,20 @@ void BMSThread::threadWorker() {
               m_batterydata.allVoltages[string][(NUM_CELLS_PER_CHIP * i) + index] = voltage;
               totalVoltage[string] += voltage;
 
+              // The flat 0..167 cell index, named once and used for the min/max cells and the
+              // balancing mask alike. Writing the expression out three times is how the mask's
+              // bit ordering would drift from the voltage ordering, which is not a failure that
+              // announces itself: the log would simply attribute balancing to the wrong cells.
+              const uint8_t cellIndex =
+                index + NUM_CELLS_PER_CHIP*(i + (string * NUM_CHIPS / NUM_STRINGS));
+
               if (voltage < minVoltage && voltage != 0) {
                 minVoltage = voltage;
-                minVoltage_cell = index + NUM_CELLS_PER_CHIP*(i + (string * NUM_CHIPS / NUM_STRINGS));
+                minVoltage_cell = cellIndex;
               }
               if (voltage > maxVoltage) {
                 maxVoltage = voltage;
-                maxVoltage_cell = index + NUM_CELLS_PER_CHIP*(i + (string * NUM_CHIPS / NUM_STRINGS));
+                maxVoltage_cell = cellIndex;
               }
               //totalVoltage += voltage;
               //serial->printf("%dmV ", voltage);
@@ -492,14 +557,14 @@ void BMSThread::threadWorker() {
               if (voltage >= BMS_FAULT_VOLTAGE_THRESHOLD_HIGH) {
                 // Set fault line
                 //std::cout << "***** BMS LOW VOLTAGE FAULT *****\nVoltage at " << voltage << "\n\n";
-                throwBmsFault();
+                throwBmsFault(BMS_FAULT_CELL_OVERVOLTAGE);
                 voltagecheckOK = false;
                 ioexp_bits |= (1 << MCP_PIN_BMSERR);
               }
               if (voltage <= BMS_FAULT_VOLTAGE_THRESHOLD_LOW) {
                 // Set fault line
                 //std::cout << "***** BMS HIGH VOLTAGE FAULT *****\nVoltage at " << voltage << "\n\n";
-                throwBmsFault();
+                throwBmsFault(BMS_FAULT_CELL_UNDERVOLTAGE);
                 voltagecheckOK = false;
                 ioexp_bits |= (1 << MCP_PIN_BMSERR);
               }
@@ -516,6 +581,7 @@ void BMSThread::threadWorker() {
                   // Enable discharging
                   conf.dischargeState.value |= (1 << j);
                   m_batterydata.numBalancing++;
+                  markBalancing(m_batterydata, cellIndex);
 
                   // And turn on G light to show low temp
                   ioexp_bits |= (1 << MCP_PIN_G);
@@ -524,6 +590,7 @@ void BMSThread::threadWorker() {
                   //printf("DISCHARGE CHIP: %d CELL: %d: %dmV (%dmV)\n", chip_loc, index, voltage, (voltage - prevMinVoltage));
                   conf.dischargeState.value |= (1 << j);
                   m_batterydata.numBalancing++;
+                  markBalancing(m_batterydata, cellIndex);
                 } else {
                   // Disable discharging
                   conf.dischargeState.value &= ~(1 << j);
@@ -596,7 +663,12 @@ void BMSThread::threadWorker() {
                 }
                 // max temp check
                 if (steinhart > BMS_TEMPERATURE_THRESHOLD && *DI_ChargeSwitch) {
-                  throwBmsFault();
+                  // No dash indication, unlike the voltage and string faults: throwBmsFault()
+                  // sets led4 but no ioexp bit. That is deliberate and not a missing-indicator
+                  // bug -- the 42 C stop is conservative against a cell datasheet that only
+                  // begins charge throttling at 45 C, so the fault fires with margin in hand
+                  // and there is nothing for a driver to react to.
+                  throwBmsFault(BMS_FAULT_OVERTEMP);
                 }
               }
 
@@ -661,7 +733,10 @@ void BMSThread::threadWorker() {
         if (abs((int)totalVoltage[i] - (int)packVoltage) > BMS_STRING_DIFFERENCE_THRESHOLD) {
           //std::cout << "String check failed " << packVoltage << " " << totalVoltage[0] << "\n";
           stringcheckOK = false;
-          *led3 = 1;      
+          // Records the fault without calling throwBmsFault(), matching what this branch has
+          // always done: it lights EGR and clears stringcheckOK but does not stop discharge.
+          setFault(BMS_FAULT_STRING_IMBALANCE);
+          *led3 = 1;
           ioexp_bits |= (1 << MCP_PIN_EGR);
           break;
         }
@@ -695,6 +770,10 @@ void BMSThread::threadWorker() {
       m_batterysummary.maxTemp_box = maxTemp_box;
       m_batterysummary.totalCurrent = m_batterydata.totalCurrent;
       m_batterysummary.totalVoltage = packVoltage;
+      // Mean cell voltage in mV, the same expression the display below uses -- note the
+      // divisor is the cells in *series*, 84, because the two strings are in parallel.
+      m_batterysummary.avgVoltage =
+        (uint16_t)(packVoltage / (NUM_CELLS_PER_CHIP * NUM_CHIPS / NUM_STRINGS));
 
       m_batterysummary.joules += ((m_batterydata.totalCurrent/1000) * ((int32_t)(packVoltage/1000))/m_frequency);
       m_batterydata.joules = m_batterysummary.joules;
@@ -707,6 +786,15 @@ void BMSThread::threadWorker() {
       m_batterydata.packVoltage = packVoltage;
 
       prevMinVoltage = minVoltage;
+
+      // Fast-tier telemetry: one set per scan, 10 Hz driving and 2 Hz charging. Emitted inside
+      // the !pecStatus branch because these three frames carry measurements, and a scan whose
+      // PEC failed has none -- transmitting the previous scan's numbers with a fresh timestamp
+      // would be indistinguishable from a real reading that happened not to change. The status
+      // frame is different and goes out either way; see below.
+      telemetry_emit_pack(m_batterydata);
+      telemetry_emit_cell_summary(m_batterysummary);
+      telemetry_emit_temp_summary(m_batterysummary, m_inverterdata.heatsinktemp);
 
       // mail_t *msg = m_outbox->alloc();
       // msg->msg_event = NEW_CELL_DATA;
@@ -743,6 +831,13 @@ void BMSThread::threadWorker() {
       inverterCAN.bytes[7] = crc & 0xFF;
 
       canBus->write(CANMessage(0x3F, inverterCANSend, 8));
+
+      // Echo it into the log. A CAN node does not receive its own frames, so without this the
+      // proxy never sees 0x3F and the single most important signal for the throttle
+      // investigation -- the BMS limit bit at 29 -- is silently absent from a log that looks
+      // otherwise complete. Emitted at transmit request, so it is evidence of intent rather
+      // than proof the frame won arbitration.
+      telemetry_echo_frame(TLM_ID_VCU_CONTROL, inverterCANSend, 8);
 
       // std::cout << "CAN bytes: ";
       // for (int p = 0; p < 8; p++) {
@@ -785,6 +880,13 @@ void BMSThread::threadWorker() {
       // printbuff.str(std::string());
 
       if (++printCount == CELL_PRINT_MULTIPLE) {
+        // Read-and-clear, once, here. canRxMaxLatencyUs is a maximum over the logging interval
+        // and it has exactly one owner: if both the link-health frame and the CSV clear it,
+        // each reports the maximum over only part of the interval and both understate it.
+        const uint32_t maxLatencyUs = canRxMaxLatencyUs;
+        canRxMaxLatencyUs = 0;
+        (void)maxLatencyUs;  // LINK_TEST builds emit neither consumer
+
 #if PRINT_TIMING
         // Wall time of the whole CSV emit. Under UnbufferedSerial this is formatting plus
         // transmission serialised, because the write spins on the TX-ready flag; under
@@ -795,17 +897,20 @@ void BMSThread::threadWorker() {
         uint32_t printStartUs = us_ticker_read();
 #endif
 #if SLCAN_MODE
+#if SLCAN_VERIFY_PATTERN
         {
+          // Link instrument, not telemetry: a self-verifying counter pattern in place of the
+          // real slow tier. Block boundaries are handled inside slcan_emit() now, so that
+          // forwarded bus traffic is counted into the blocks too.
           static uint32_t slcanCounter = 0;
-          static uint16_t sinceSeq = 0;
           for (uint16_t k = 0; k < SLCAN_FRAMES_PER_CYCLE; k++) {
             slcan_emit_synthetic(slcanCounter++);
-            if (++sinceSeq >= SLCAN_SEQ_INTERVAL) {
-              sinceSeq = 0;
-              slcan_emit_sequence();
-            }
           }
         }
+#else
+        // Slow tier: cells, thermistors, die temperatures, link health, balancing mask.
+        telemetry_emit_slow(m_batterydata, maxLatencyUs);
+#endif
 #elif LINK_TEST
         {
           static uint32_t linkTestSeq = 0;
@@ -813,7 +918,15 @@ void BMSThread::threadWorker() {
             emit_link_test_line(linkTestSeq++);
           }
         }
-#else
+#endif
+
+#if EMIT_CSV
+#if SLCAN_DUAL_EMIT
+        // Dual-emit: the CSV shares the stream with the frames, so it has to share the frame
+        // lock as well. Without it, a frame forwarded from the main loop lands in the middle of
+        // a CSV record and produces exactly the splice this design exists to prevent.
+        slcan_lock();
+#endif
         // Print line of CSV data
         std::cout << std::fixed << std::setprecision(1) << timestamp << ',' << m_batterydata.packVoltage/1000.0 ;
         for (uint16_t i = 0; i < NUM_STRINGS; i++) {
@@ -831,16 +944,12 @@ void BMSThread::threadWorker() {
         for (uint16_t i = 0; i < NUM_CHIPS; i++) { 
           std::cout << ',' << m_batterydata.allTemperatures[i];
         }
-        if (*DI_ChargeSwitch) {
-          for (uint16_t i = 0; i < NUM_CHIPS; i++) {
-            std::cout << ',' << (int)m_batterydata.dieTemps[i]; 
-            //std::cout << "chiptemp\n";
-          }
-        } else {
-          for (uint16_t i = 0; i < NUM_CHIPS; i++) {
-            std::cout << ',';
-            //std::cout << "chiptemp\n";
-          }
+        // Always populated now. The read moved to the logging scan and lost its charge-switch
+        // gate, so these columns are no longer empty while driving -- the field count is
+        // unchanged, but a parser that treated an empty die-temp column as "not charging" will
+        // need to look at the charge-switch status instead.
+        for (uint16_t i = 0; i < NUM_CHIPS; i++) {
+          std::cout << ',' << (int)m_batterydata.dieTemps[i];
         }
         std::cout << ',' << (int)m_inverterdata.heatsinktemp;
         std::cout << ',' << (int)m_batterydata.numBalancing;
@@ -848,12 +957,14 @@ void BMSThread::threadWorker() {
         std::cout << ',' << (unsigned long)canRxSwDrops;
         std::cout << ',' << (unsigned long)canRxHwOverruns;
         std::cout << ',' << (unsigned long)canRxQueuePeak;
-        // Read-and-clear: canLatUs is the max over this print interval. See CanRx.h for why
-        // a lifetime max would be useless here.
-        std::cout << ',' << (unsigned long)canRxMaxLatencyUs;
-        canRxMaxLatencyUs = 0;
+        // canLatUs is the max over this print interval; it was read and cleared once above.
+        // See CanRx.h for why a lifetime max would be useless here.
+        std::cout << ',' << (unsigned long)maxLatencyUs;
         std::cout << '\n';
-#endif // SLCAN_MODE / LINK_TEST
+#if SLCAN_DUAL_EMIT
+        slcan_unlock();
+#endif
+#endif // EMIT_CSV
 
 #if PRINT_TIMING
         // Timed before the report below is emitted, so the report is not in its own numbers.
@@ -999,12 +1110,58 @@ void BMSThread::threadWorker() {
       msg->msg_event = BATT_ERR;
       m_inbox_main->put(msg);
       // std::cout << "PEC error! " << pecprint << '\n';
-      *led3 = 1;      
+      *led3 = 1;
       ioexp_bits |= (1 << MCP_PIN_EGR);
       errCount++;
+      setFault(BMS_FAULT_PEC);
+      // Reported as its own frame carrying the failing chip mask. The 2021 logs printed this
+      // sort of thing straight into the middle of a CSV record, which is why 5,099 archived
+      // rows are structurally broken; a coded frame cannot corrupt a data frame, so the error
+      // no longer has to choose between being reported and being safe to report.
+      telemetry_emit_diag(BMS_DIAG_PEC_FAILURE, pecStatus, errCount, 0);
     }
 
     ioexp->write_mask(ioexp_bits, MCP_BMS_THREAD_MASK);
+
+    // Status frame, emitted every scan whether or not the PEC read succeeded -- it carries the
+    // fault and status bits and the ioexp mirror, all of which are meaningful (arguably most
+    // meaningful) on a scan that failed. Placed after write_mask() so byte 3 mirrors the
+    // literal value the dash was given rather than a reconstruction of it.
+    {
+      BmsStatusFields sf;
+      sf.faultLatched = faultBitsLatched;
+      sf.faultNow     = faultBitsNow;
+      sf.status =
+          (uint8_t)((m_discharging                            ? 1u : 0u) << BMS_STATUS_DISCHARGING)
+        | (uint8_t)((*DI_ChargeSwitch                         ? 1u : 0u) << BMS_STATUS_CHARGE_SWITCH)
+        | (uint8_t)((*DO_ChargeEnable                         ? 1u : 0u) << BMS_STATUS_CHARGE_EN)
+        | (uint8_t)((*DO_BattContactor                        ? 1u : 0u) << BMS_STATUS_CONTACTORS)
+        | (uint8_t)((m_batterydata.numBalancing > 0           ? 1u : 0u) << BMS_STATUS_BALANCING)
+        | (uint8_t)((SoC < BMS_SOC_RESERVE_THRESHOLD          ? 1u : 0u) << BMS_STATUS_SOC_RESERVE)
+        | (uint8_t)((voltagecheckOK                           ? 1u : 0u) << BMS_STATUS_VCHECK_OK)
+        | (uint8_t)((stringcheckOK                            ? 1u : 0u) << BMS_STATUS_STRINGCHECK_OK);
+      sf.ioexpOut = (uint8_t)(ioexp_bits & 0xFF);
+#if TELEMETRY_READ_GPIO_INPUTS
+      // MCP23017 port B, pin 8+n in bit n.
+      sf.ioexpIn = (uint8_t)((ioexp->read_mask(MCP_BMS_THREAD_READ_MASK) >> 8) & 0xFF);
+#else
+      sf.ioexpIn = 0;
+#endif
+      sf.errCount = errCount;
+      telemetry_emit_status(sf);
+    }
+
+    // Schema identity at 1 Hz in both rate modes, since m_frequency is the scan rate. A
+    // consumer joining mid-stream therefore attributes at most one second of data to an unknown
+    // schema, for about 0.4% of the link.
+    {
+      static uint16_t schemaCount = 0;
+      if (++schemaCount >= (uint16_t)m_frequency) {
+        schemaCount = 0;
+        telemetry_emit_schema();
+      }
+    }
+
     Watchdog::get_instance().kick();
 
     // Compute time elapsed since beginning of measurements and sleep for

@@ -52,6 +52,35 @@ size_t build(char *out, uint32_t id, const uint8_t *data, uint8_t dlc, bool exte
     return n;
 }
 
+// Emit the integrity frame and start a new block. Caller must hold s_lock.
+void emit_sequence_locked()
+{
+    uint8_t payload[8];
+    // Little-endian, like every other frame in the map. This was big-endian in the first
+    // prototype, which made the one frame that is supposed to police the stream the only one
+    // that disagreed with the DBC about byte order.
+    payload[0] = (uint8_t)(s_seqCounter & 0xFF);
+    payload[1] = (uint8_t)(s_seqCounter >> 8);
+    payload[2] = (uint8_t)(s_frames & 0xFF);
+    payload[3] = (uint8_t)(s_frames >> 8);
+    payload[4] = (uint8_t)(s_crc & 0xFF);
+    payload[5] = (uint8_t)(s_crc >> 8);
+    payload[6] = 0;
+    payload[7] = 0;
+
+    // The sequence frame reports the block before it, and its own bytes are excluded from
+    // every block -- it is written directly rather than through slcan_emit(), so it neither
+    // accumulates into the CRC nor counts towards s_frames. The host must skip it the same
+    // way: CRC covers exactly the frames between two sequence frames.
+    s_seqCounter++;
+    s_crc = 0xFFFF;
+    s_frames = 0;
+
+    char line[32];
+    size_t n = build(line, SLCAN_SEQ_ID, payload, 8, true);
+    std::cout.write(line, n);
+}
+
 } // namespace
 
 void slcan_init()
@@ -75,39 +104,33 @@ void slcan_emit(uint32_t id, const uint8_t *data, uint8_t dlc, bool extended)
     }
     s_frames++;
     std::cout.write(line, n);
+
+    // Block boundary. Checked here so that every emitted frame is counted exactly once no
+    // matter which thread produced it.
+    if (s_frames >= SLCAN_SEQ_INTERVAL) {
+        emit_sequence_locked();
+    }
     s_lock.unlock();
 }
 
 void slcan_emit_sequence()
 {
     s_lock.lock();
-
-    uint8_t payload[8];
-    payload[0] = (uint8_t)(s_seqCounter >> 8);
-    payload[1] = (uint8_t)(s_seqCounter & 0xFF);
-    payload[2] = (uint8_t)(s_frames >> 8);
-    payload[3] = (uint8_t)(s_frames & 0xFF);
-    payload[4] = (uint8_t)(s_crc >> 8);
-    payload[5] = (uint8_t)(s_crc & 0xFF);
-    payload[6] = 0;
-    payload[7] = 0;
-
-    // The sequence frame reports the block before it, and its own bytes are excluded from
-    // every block -- it is written directly rather than through slcan_emit(), so it neither
-    // accumulates into the CRC nor counts towards s_frames. The host must skip it the same
-    // way: CRC covers exactly the frames between two sequence frames.
-    s_seqCounter++;
-    s_crc = 0xFFFF;
-    s_frames = 0;
-
-    char line[32];
-    size_t n = build(line, SLCAN_SEQ_ID, payload, 8, true);
-    std::cout.write(line, n);
-
+    emit_sequence_locked();
     s_lock.unlock();
 }
 
 uint16_t slcan_frames_since_sequence()
 {
     return s_frames;
+}
+
+void slcan_lock()
+{
+    s_lock.lock();
+}
+
+void slcan_unlock()
+{
+    s_lock.unlock();
 }

@@ -200,6 +200,27 @@ extern PwmOut* fuelgauge;
 #define MCP_PIN_LOWFUEL 3
 #endif
 
+// Parenthesised: this is mirrored into byte 4 of the BmsStatus telemetry frame, where it is
+// used in an expression rather than passed straight to write_mask(), and an unparenthesised
+// chain of `|` binds wrong there.
 #ifndef MCP_BMS_THREAD_MASK
-#define MCP_BMS_THREAD_MASK MCP_PIN_BIT(MCP_PIN_LOWFUEL) | MCP_PIN_BIT(MCP_PIN_BMSERR) | MCP_PIN_BIT(MCP_PIN_EGR) | MCP_PIN_BIT(MCP_PIN_G)
+#define MCP_BMS_THREAD_MASK (MCP_PIN_BIT(MCP_PIN_LOWFUEL) | MCP_PIN_BIT(MCP_PIN_BMSERR) | MCP_PIN_BIT(MCP_PIN_EGR) | MCP_PIN_BIT(MCP_PIN_G))
+#endif
+
+//
+// MCP23017 input side, port B. The mainline firmware does not read these at all; the CC/CV knob
+// switches exist only on the charge-control branch. Byte 7 of the BmsStatus frame is reserved
+// for them so that branch can land without renumbering the frame, and TELEMETRY_READ_GPIO_INPUTS
+// is the one knob that branch has to flip.
+//
+#ifndef MCP_PIN_KNOB1SW
+#define MCP_PIN_KNOB1SW 11
+#endif
+
+#ifndef MCP_PIN_KNOB2SW
+#define MCP_PIN_KNOB2SW 12
+#endif
+
+#ifndef MCP_BMS_THREAD_READ_MASK
+#define MCP_BMS_THREAD_READ_MASK (MCP_PIN_BIT(MCP_PIN_KNOB1SW) | MCP_PIN_BIT(MCP_PIN_KNOB2SW))
 #endif

@@ -45,12 +45,27 @@ void slcan_init();
 // Emit one frame. Whole-frame atomic: telemetry comes from the BMS thread and forwarded bus
 // traffic from the main loop, and two threads interleaving mid-frame would manufacture exactly
 // the corruption this exists to measure.
+//
+// Closes the block and emits the integrity frame automatically once SLCAN_SEQ_INTERVAL frames
+// have gone out. Counting here rather than in the callers is what makes forwarded bus traffic
+// covered: the main loop forwards frames without any idea of the block structure, and when the
+// BMS thread owned the counter those frames sat inside blocks whose declared frame count did
+// not include them.
 void slcan_emit(uint32_t id, const uint8_t *data, uint8_t dlc, bool extended);
 
-// Emit the sequence/CRC frame and start a new block.
+// Emit the sequence/CRC frame and start a new block. Called automatically by slcan_emit(); only
+// needed directly to force a block boundary.
 void slcan_emit_sequence();
 
 // Frames emitted since the last sequence frame, for the caller's pacing decisions.
 uint16_t slcan_frames_since_sequence();
+
+// Hold the frame lock across something that is not a frame. The only use is the dual-emit
+// verification build, where a CSV record is written into the same stream: without the lock a
+// forwarded frame from the main loop can land in the middle of the CSV line, which is the
+// splice this whole design exists to prevent. Bytes written between these are NOT accumulated
+// into the block CRC, so a host must exclude non-frame bytes when checking it.
+void slcan_lock();
+void slcan_unlock();
 
 #endif // SLCAN_H
