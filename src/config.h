@@ -223,6 +223,27 @@
 #define SLCAN_CAN_SELFTEST 0
 #endif
 
+// BENCH ONLY -- never build this for the car. Treats every cell read as if its PEC passed, so
+// whatever the isoSPI returned with no LTC6813 boards on the far end is crunched, packed and
+// emitted as though it were real measurement.
+//
+// The point is domain coverage, not realism. Dual-emit on the car compared 134,390 fields, but
+// every one sat in the band real driving produces -- cells 3.0-4.2 V, moderate current, no
+// rails. An unterminated chain returns values at and past the extremes, which is where packing
+// bugs actually live: saturation, sign boundaries, clamps. Dual-emit is unaffected by the
+// numbers being physically meaningless, because it checks the CSV and the CAN frames against
+// each other, not against reality.
+//
+// On the car this would mean acting on fabricated cell voltages with contactors attached to a
+// 337 V pack, so it is guarded below rather than left to discipline.
+#ifndef BENCH_IGNORE_PEC
+#define BENCH_IGNORE_PEC 0
+#endif
+
+#if BENCH_IGNORE_PEC && !SLCAN_DUAL_EMIT
+#error "BENCH_IGNORE_PEC is a bench instrument for dual-emit verification. Without SLCAN_DUAL_EMIT it just feeds fabricated cell data to the contactor logic with nothing checking it."
+#endif
+
 // Even parity on the stdio UART. The host sets the same through the CDC line coding, which
 // the interface MCU applies to its own UART side. This does not report errors by itself --
 // the point is the comparison. If the corruption rate moves, the damage is happening on the

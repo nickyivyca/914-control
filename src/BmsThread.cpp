@@ -483,8 +483,10 @@ void BMSThread::threadWorker() {
     // Now time to crunch numbers
 
 
-    if (!pecStatus) {
-    //if (true) {
+    // BENCH_IGNORE_PEC treats a failed read as good so the numbers behind it -- whatever the
+    // isoSPI returned with nothing on the far end -- still flow through the crunch, pack and
+    // emit path. See config.h. Off on the car, where this would be dangerous.
+    if (!pecStatus || BENCH_IGNORE_PEC) {
       for (uint8_t i = 0; i < NUM_STRINGS; i++) {
         minTemps[tempSelect][i] = BMS_TEMPERATURE_THRESHOLD;
       }
