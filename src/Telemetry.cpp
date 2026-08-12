@@ -23,7 +23,7 @@ namespace {
  *   joules         J
  *   allVoltages    mV
  *   allTemperatures  degC as float
- *   dieTemps       whole degC, stored in a uint8_t
+ *   dieTemps       whole degC, stored in an int8_t (signed: the part's range is -40 to +125 C)
  *   heatsinktemp   whole degC (Main.cpp already divides the inverter's 0.1 degC by 10)
  */
 
@@ -171,7 +171,7 @@ void telemetry_emit_slow(const batterydata_t &d, uint32_t maxLatencyUs)
         for (uint8_t k = 0; k < 8; k++) {
             uint16_t idx = frame * 8 + k;
             if (idx < NUM_CHIPS) {
-                p[k] = d.dieTemps[idx];
+                p[k] = (uint8_t)d.dieTemps[idx];
             }
         }
         slcan_emit(TLM_ID_DIE_BASE + frame, p, 8, true);

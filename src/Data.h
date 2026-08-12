@@ -10,7 +10,10 @@
 typedef struct {
   uint16_t allVoltages[NUM_STRINGS][NUM_CHIPS * NUM_CELLS_PER_CHIP];
   float allTemperatures[NUM_CHIPS];
-  uint8_t dieTemps[NUM_CHIPS];
+  // Signed: the LTC6813's die-temperature range is -40 to +125 C, which fits int8_t exactly and
+  // does not fit uint8_t. The DBC has always declared this signal signed; the storage did not,
+  // so a reading above 127 decoded negative and one below 0 was lost on the conversion.
+  int8_t dieTemps[NUM_CHIPS];
   int stringCurrents[NUM_STRINGS];
   uint8_t numBalancing;
   // One bit per cell, flat index 0..(NUM_CHIPS*NUM_CELLS_PER_CHIP-1), bit n of byte b being

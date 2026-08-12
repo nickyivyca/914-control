@@ -328,7 +328,14 @@ void BMSThread::threadWorker() {
     uint8_t maxVoltage_cell = 255;
     float minTemp = std::numeric_limits<float>::max();
     uint8_t minTemp_box = 255;
-    float maxTemp = std::numeric_limits<float>::min();
+    // lowest(), not min(). For a floating-point type min() is the smallest positive normalised
+    // value (~1.175e-38), not the most negative one -- so this used to start the running maximum
+    // at approximately zero. Any reading above freezing still won, which is why the car never
+    // showed it; but with the whole pack below 0 C nothing ever exceeded the initialiser and
+    // maxTemp stayed at ~0, reporting TempMax as 0.0 C with maxTemp_box left at its invalid 255.
+    // min() *is* the most negative value for integer types, which is what makes this misread.
+    // Found by bench dual-emit, where every thermistor reads -273.1 C -- see notes/plans.
+    float maxTemp = std::numeric_limits<float>::lowest();
     uint8_t maxTemp_box = 255;
     unsigned int totalVoltage[NUM_STRINGS] = {0};
     //stringCurrents[NUM_STRINGS] = 0;

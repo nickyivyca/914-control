@@ -275,7 +275,7 @@ void LTC6813Bus::getStatus(LTC6813::Status statuses[NUM_CHIPS]) {
     statuses[k].thermalShutDown = rxbuf[1][k*6 + 5] & 1;
   }
 }
-void LTC6813Bus::getDieTemps(uint8_t dieTemps[NUM_CHIPS]) {
+void LTC6813Bus::getDieTemps(int8_t dieTemps[NUM_CHIPS]) {
   //Timer t;
   //t.start();
   m_bus.SendCommandAndPoll(LTC681xBus::BuildChainBusCommand
@@ -289,7 +289,13 @@ void LTC6813Bus::getDieTemps(uint8_t dieTemps[NUM_CHIPS]) {
 
   for (unsigned int k = 0; k < NUM_CHIPS; k++) { // iterate over each chip's worth of data
     uint16_t raw_temp = rxbuf[k*6 + 2] | (rxbuf[k*6 + 3] << 8);
-    dieTemps[k] = (uint8_t)(raw_temp * (0.0001)/(0.0076) - 276.0);
+    // Clamped before the cast. A float-to-integer conversion whose result does not fit the
+    // destination is undefined behaviour, and a failed read puts raw_temp anywhere in 0..65535
+    // -- which is exactly the case this is reached in when the isoSPI chain is not answering.
+    float degC = raw_temp * (0.0001f) / (0.0076f) - 276.0f;
+    if (degC < -128.0f) degC = -128.0f;
+    if (degC > 127.0f) degC = 127.0f;
+    dieTemps[k] = (int8_t)degC;
   }
 }
 
