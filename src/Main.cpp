@@ -324,6 +324,11 @@ void initIO() {
   //serial->printf("INIT\n");
   
   canBus = new IsrSafeCAN(PIN_CAN_RX, PIN_CAN_TX, CAN_FREQUENCY);
+#if SLCAN_CAN_SELFTEST
+  // Bench harness; see config.h. Set after construction, because can_frequency() writes MOD
+  // wholesale to restore the pre-change mode -- doing this first would be undone there.
+  canBus->mode(CAN::LocalTest);
+#endif
   led1 = new DigitalOut(LED1);
   led2 = new DigitalOut(LED2);
   led3 = new DigitalOut(LED3);

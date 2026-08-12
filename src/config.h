@@ -203,6 +203,26 @@
 #define SLCAN_HOST_TX 0
 #endif
 
+// BENCH ONLY -- never build this for the car. Puts the CAN controller into self-test mode
+// (LPC17xx CANMOD bit 2), where can_write() issues a Self Reception Request instead of a normal
+// transmit: the frame needs no acknowledge from another node and is delivered straight back to
+// this controller's own receive buffer. That makes SLCAN_HOST_TX testable with no inverter, no
+// charger and no bus partner.
+//
+// It still uses the real pins -- the LPC's core is SJA1000-derived, so TX drives the pin and RX
+// samples it. Either a powered CAN transceiver (which loops its own TXD back through RXD) or a
+// direct jumper from p29 to p30 is required; with neither, transmits are accepted but nothing
+// comes back.
+//
+// The round trip is what makes this a test rather than an echo. handle_transmit() already calls
+// slcan_emit() on a successful write, so in this mode every host frame appears TWICE in the tap
+// stream: once as that echo, once as a genuinely received frame. The count discriminates --
+// two copies means parse and self-reception both worked, one means the write was accepted but
+// the frame never came back off the pins, none means the command was rejected.
+#ifndef SLCAN_CAN_SELFTEST
+#define SLCAN_CAN_SELFTEST 0
+#endif
+
 // Even parity on the stdio UART. The host sets the same through the CDC line coding, which
 // the interface MCU applies to its own UART side. This does not report errors by itself --
 // the point is the comparison. If the corruption rate moves, the damage is happening on the
