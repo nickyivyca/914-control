@@ -68,4 +68,33 @@ uint16_t slcan_frames_since_sequence();
 void slcan_lock();
 void slcan_unlock();
 
+/*
+ * Host -> bus. Makes the VCU a real SLCAN adapter rather than a one-way tap, so python-can,
+ * SavvyCAN and openinverter-can-tool can transmit through it.
+ *
+ * The reason this exists: openinverter's CAN map is configurable over CAN via SDO (indices
+ * 0x3000 add-TX, 0x3001 add-RX, 0x3100 read/delete, 0x5002 save), and stm32-sine 5.35 already
+ * wires it up. Without a transmit path the VCU can watch that conversation but not have it.
+ *
+ * SAFETY, stated accurately: this cannot command torque. The inverter runs potmode 1
+ * (DualChannel), so throttle comes from the pedal ADC and nothing on CAN accelerates the car.
+ * What CAN can do is (a) assert the control frame's brake and BMS-limit bits, which only ever
+ * derate, and (b) write parameters over SDO -- which is the real exposure, since that includes
+ * potmode itself, and a bad write can be persisted to flash. The hazard is misconfiguration,
+ * not a runaway. Off by default anyway; there is no reason to leave a transmit path open.
+ */
+#if SLCAN_HOST_TX
+void slcan_input_init();
+
+// Drain and act on whatever the host has sent. Non-blocking; call from the main loop.
+void slcan_poll_input();
+
+// Frames the host asked us to transmit, and how many of those the CAN peripheral refused.
+extern volatile uint32_t slcanHostTxFrames;
+extern volatile uint32_t slcanHostTxErrors;
+#else
+inline void slcan_input_init() {}
+inline void slcan_poll_input() {}
+#endif
+
 #endif // SLCAN_H

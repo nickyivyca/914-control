@@ -146,6 +146,10 @@ int main() {
   Timer t;
   t.start();
 
+  // Compiled out unless SLCAN_HOST_TX. Set up here rather than in initIO() because it needs the
+  // stdio console to exist, and mbed builds that lazily on first use.
+  slcan_input_init();
+
   c1uac = 0;
   c2uac = 0;
   c3uac = 0;
@@ -289,6 +293,10 @@ int main() {
             break;
         }
     } 
+
+    // Host -> bus. Polled once per MAIN_PERIOD, so a host command is acted on within 50 ms --
+    // far inside the timeouts python-can and openinverter-can-tool use for SDO transfers.
+    slcan_poll_input();
 
     //print_cpu_stats();
 

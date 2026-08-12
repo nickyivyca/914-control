@@ -190,6 +190,19 @@
 #define SLCAN_FORWARD_CAN 1
 #endif
 
+// Accept SLCAN commands from the host and put those frames on the vehicle bus, making this a
+// two-way adapter rather than a tap. See Slcan.h for the command set and for what the exposure
+// actually is -- short version: it cannot command torque, because the throttle is analog, but
+// it can write inverter parameters over SDO and those can be persisted to flash.
+//
+// The reason it exists: openinverter's CAN map is configurable over CAN (SDO 0x3000/0x3001/
+// 0x3100/0x5002) and stm32-sine 5.35 already supports it, so openinverter-can-tool can read,
+// rewrite and save the inverter's map through this link -- without unplugging the VCU to get
+// at the inverter's serial console.
+#ifndef SLCAN_HOST_TX
+#define SLCAN_HOST_TX 0
+#endif
+
 // Even parity on the stdio UART. The host sets the same through the CDC line coding, which
 // the interface MCU applies to its own UART side. This does not report errors by itself --
 // the point is the comparison. If the corruption rate moves, the damage is happening on the

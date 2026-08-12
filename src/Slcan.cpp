@@ -3,6 +3,7 @@
 #include "mbed.h"
 #include "rtos.h"
 
+#include "pinout.h"
 #include "Slcan.h"
 
 namespace {
@@ -134,3 +135,176 @@ void slcan_unlock()
 {
     s_lock.unlock();
 }
+
+// ---------------------------------------------------------------- host -> bus
+
+#if SLCAN_HOST_TX
+
+volatile uint32_t slcanHostTxFrames = 0;
+volatile uint32_t slcanHostTxErrors = 0;
+
+namespace {
+
+// Longest command is 'T' + 8 id + 1 dlc + 16 data = 26, plus slack for junk.
+char s_cmd[40];
+size_t s_cmdLen = 0;
+bool s_overrun = false;
+
+FileHandle *s_in = nullptr;
+
+// Replies go out under the same lock as frames. Without it an ack lands inside a telemetry
+// frame and the host rejects that frame -- the exact splice the mutex exists to prevent.
+// Reply bytes are deliberately NOT fed to crc_byte: the integrity CRC covers emitted frames
+// only, so a host that CRCs frame bytes still matches. Same rule as the dual-emit CSV.
+void reply(const char *s, size_t n)
+{
+    s_lock.lock();
+    std::cout.write(s, n);
+    s_lock.unlock();
+}
+
+inline void reply_ok()   { reply("\r", 1); }
+inline void reply_err()  { reply("\a", 1); }
+
+int hexval(char c)
+{
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    return -1;
+}
+
+// Parse n hex digits starting at p. Returns false on any non-hex digit.
+bool hexfield(const char *p, size_t n, uint32_t &out)
+{
+    uint32_t v = 0;
+    for (size_t i = 0; i < n; i++) {
+        int d = hexval(p[i]);
+        if (d < 0) return false;
+        v = (v << 4) | (uint32_t)d;
+    }
+    out = v;
+    return true;
+}
+
+// t<3 id><dlc><data>  /  T<8 id><dlc><data>  /  r,R the same without data.
+void handle_transmit(const char *cmd, size_t len)
+{
+    const bool extended = (cmd[0] == 'T' || cmd[0] == 'R');
+    const bool remote   = (cmd[0] == 'r' || cmd[0] == 'R');
+    const size_t idlen  = extended ? 8 : 3;
+
+    if (len < 1 + idlen + 1) { reply_err(); return; }
+
+    uint32_t id, dlc;
+    if (!hexfield(cmd + 1, idlen, id))          { reply_err(); return; }
+    if (!hexfield(cmd + 1 + idlen, 1, dlc))     { reply_err(); return; }
+    if (dlc > 8)                                { reply_err(); return; }
+
+    uint8_t data[8] = {0};
+    if (!remote) {
+        // The frame's length is fixed by its DLC. Enforcing that here is what stops a
+        // truncated command being transmitted as a short frame with garbage payload.
+        if (len != 1 + idlen + 1 + dlc * 2)     { reply_err(); return; }
+        for (uint32_t i = 0; i < dlc; i++) {
+            uint32_t b;
+            if (!hexfield(cmd + 1 + idlen + 1 + i * 2, 2, b)) { reply_err(); return; }
+            data[i] = (uint8_t)b;
+        }
+    } else if (len != 1 + idlen + 1) {
+        reply_err();
+        return;
+    }
+
+    CANMessage msg;
+    msg.id     = id;
+    msg.len    = (uint8_t)dlc;
+    msg.format = extended ? CANExtended : CANStandard;
+    msg.type   = remote ? CANRemote : CANData;
+    for (uint32_t i = 0; i < dlc; i++) {
+        msg.data[i] = data[i];
+    }
+
+    if (canBus->write(msg)) {
+        slcanHostTxFrames++;
+        // Echo it into the log. The VCU cannot receive its own transmission, so without this
+        // the record shows the inverter's SDO replies with nothing that provoked them.
+        slcan_emit(id, data, (uint8_t)dlc, extended);
+        reply_ok();
+    } else {
+        slcanHostTxErrors++;
+        reply_err();
+    }
+}
+
+void handle_command(const char *cmd, size_t len)
+{
+    if (len == 0) { reply_ok(); return; }
+
+    switch (cmd[0]) {
+        case 't': case 'T': case 'r': case 'R':
+            handle_transmit(cmd, len);
+            break;
+
+        // Open, close, bitrate, BTR, filter mask/code, timestamps. Accepted and ignored: the
+        // bus is already up at CAN_FREQUENCY and the VCU is a node on it, not a dongle that
+        // can go offline. Answering ACK rather than BELL matters -- python-can's slcan backend
+        // sends C, S, O on open and treats a BELL as a fatal error.
+        case 'O': case 'C': case 'S': case 's':
+        case 'M': case 'm': case 'Z':
+            reply_ok();
+            break;
+
+        case 'V': reply("V1013\r", 6); break;   // hardware/software version
+        case 'N': reply("N914C\r", 6); break;   // serial number
+        case 'F': reply("F00\r", 4); break;     // status flags, none latched
+
+        default:
+            reply_err();
+            break;
+    }
+}
+
+} // namespace
+
+void slcan_input_init()
+{
+    // The console file handle, not the `serial` object: with stdio-buffered-serial the console
+    // owns the UART's receive interrupt and buffers into its own queue, so reading the raw
+    // UnbufferedSerial would race it and lose bytes.
+    s_in = mbed_file_handle(STDIN_FILENO);
+    if (s_in != nullptr) {
+        s_in->set_blocking(false);
+    }
+    s_cmdLen = 0;
+    s_overrun = false;
+}
+
+void slcan_poll_input()
+{
+    if (s_in == nullptr) {
+        return;
+    }
+
+    char c;
+    while (s_in->read(&c, 1) == 1) {
+        if (c == '\r' || c == '\n') {
+            if (s_overrun) {
+                // The command was longer than any valid one, so it is junk however it ends.
+                // Report it rather than acting on a truncated prefix.
+                reply_err();
+            } else {
+                s_cmd[s_cmdLen] = '\0';
+                handle_command(s_cmd, s_cmdLen);
+            }
+            s_cmdLen = 0;
+            s_overrun = false;
+        } else if (s_cmdLen < sizeof(s_cmd) - 1) {
+            s_cmd[s_cmdLen++] = c;
+        } else {
+            s_overrun = true;
+        }
+    }
+}
+
+#endif // SLCAN_HOST_TX
