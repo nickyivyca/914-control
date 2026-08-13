@@ -9,8 +9,9 @@
 /*
  * The synthetic-telemetry CAN map.
  *
- * This file is the firmware half of notes/can-id-allocation.md in the 914 notes repo; the other
- * half is notes/artifacts/generate_914_dbc.py, which emits 914-telemetry.dbc and schema_id.h.
+ * This file is the firmware half of the map; the other half is tools/generate_914_dbc.py, which
+ * emits 914-telemetry.dbc and schema_id.h. The prose description, the ID allocation table and
+ * the verification record live in notes/can-id-allocation.md in the 914 notes hub.
  * The two must agree byte for byte. They are kept honest by the schema hash: the generator
  * digests the map's structure and writes it into schema_id.h, this firmware broadcasts it, and
  * a consumer compares it against the DBC it loaded. Editing one side without regenerating the
