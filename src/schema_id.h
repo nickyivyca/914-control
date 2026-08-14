@@ -6,8 +6,8 @@
 #ifndef SCHEMA_ID_H
 #define SCHEMA_ID_H
 
-#define SCHEMA_MAJOR 0x02u
+#define SCHEMA_MAJOR 0x03u
 #define SCHEMA_MINOR 0x00u
-#define SCHEMA_HASH  0x505AA323u
+#define SCHEMA_HASH  0x489360E3u
 
 #endif // SCHEMA_ID_H

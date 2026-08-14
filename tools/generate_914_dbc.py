@@ -42,7 +42,7 @@ import sys
 # Bump MAJOR when an existing signal moves, changes scaling, or a message id changes -- an old
 # consumer would decode wrongly. Bump MINOR when signals or messages are only added -- an old
 # consumer decodes everything it knows and simply misses the new data.
-SCHEMA_MAJOR = 2
+SCHEMA_MAJOR = 3
 SCHEMA_MINOR = 0
 
 NUM_CELLS = 168          # NUM_CHIPS * NUM_CELLS_PER_CHIP
@@ -80,6 +80,13 @@ ID_INVERTER_FOC = 0x003
 ID_INVERTER_THR = 0x004
 ID_VCU_CONTROL = 0x03F
 ID_CHARGER_AC  = (0x207, 0x209, 0x20B)
+
+# openinverter's SDO server, the only route to parameters the CAN map cannot carry. nodeid is 1
+# on this car, so 0x600+1 for the request and 0x580+1 for the reply -- the same pair CanSdo
+# registers as a user message filter. See notes/inverter-sdo-polling.md.
+INVERTER_NODE_ID = 1
+ID_INVERTER_SDO_REQ  = 0x600 + INVERTER_NODE_ID
+ID_INVERTER_SDO_RESP = 0x580 + INVERTER_NODE_ID
 
 # Frames transmitted by our own charger controller (stm32-teslacharger), taken from the AddSend
 # calls in its src/chargercan.cpp. NOT the Tesla modules -- those speak 0x207/0x209/0x20B and are
@@ -309,17 +316,33 @@ emit()
 # can be set at once, and a value table would decode 0x11 as an unknown enum rather than as
 # UdcLow plus EmcyStop.
 msg(ID_INVERTER_ST, "InverterState", 8, tx="INVERTER", extended=False)
+# STATUS is 10 bits, not 9. BrakeCheck was missing here until 2026-08-13, and the car sits at
+# status = 516 = BrakeCheck | UdcBelowUdcSw at rest -- so the bit that was being dropped is set
+# in the vehicle's normal resting state, not some rare condition.
 INV_STATUS = ("UdcLow", "UdcHigh", "UdcBelowUdcSw", "UdcLim", "EmcyStop",
-              "MProt", "PotPressed", "TmpHs", "WaitStart")
+              "MProt", "PotPressed", "TmpHs", "WaitStart", "BrakeCheck")
 for i, s in enumerate(INV_STATUS):
     sig("InvSts_%s" % s, i, 1)
 sig("InvOpmode", 16, 8, hi=6)
-# canio is what the inverter believes it received over CAN. InvIo_Bms is the receive side of
-# BmsLimit in 0x03F: the VCU's command and the inverter's reception of it, logged separately.
+# Bits 24-29 carry the six din_* spot values, NOT canio -- canio is on the boot-time removal
+# list (see "Why five values cannot be mapped") and cannot be mapped at all. The six din_* carry
+# the same six inputs in the same order, so the signal names did not have to change, but the
+# MEANING did: each din_* is the OR of the physical pin and the canio bit
+# (vehiclecontrol.cpp:392-399), so this is the inverter's *effective* input rather than only
+# what arrived over CAN. InvIo_Brake and InvIo_Bms are still faithful echoes of 0x03F because
+# those two physical pins read 0 on this car; InvIo_Fwd sits high on a real wire and echoes
+# nothing.
 INV_CANIO = ("Cruise", "Start", "Brake", "Fwd", "Rev", "Bms")
 for i, s in enumerate(INV_CANIO):
     sig("InvIo_%s" % s, 24 + i, 1)
 sig("InvAuxVoltage", 32, 8, factor=0.1, hi=25.5, unit="V")
+# Two bits each, because these are tri-state: 0=Error, 1=Ok, 2=na, where `na` is what a board
+# that does not wire them reports. hwver is MiniMainboard here, which does wire them.
+sig("InvIo_Ocur", 40, 2, hi=2)
+sig("InvIo_Desat", 42, 2, hi=2)
+# Raw pin states, deliberately distinct from the latched InvSts_MProt / InvSts_EmcyStop above.
+sig("InvIo_MProt", 44, 1)
+sig("InvIo_EmcyStop", 45, 1)
 emit()
 
 # Also not transmitted yet. Signed fields are declared signed here with a POSITIVE length in the
@@ -335,14 +358,25 @@ sig("InvAmp", 48, 16, unit="dig")
 emit()
 
 msg(ID_INVERTER_THR, "InverterThrottle", 8, tx="INVERTER", extended=False)
-# Raw ADC digits. The saved parameters bound them: potmin 240 / potmax 1520, pot2min 475 /
-# pot2max 3000, so 16 bits is generous and a reading outside those bounds is itself a signal.
-sig("InvPot", 0, 16, unit="dig")
-sig("InvPot2", 16, 16, unit="dig")
+# Bytes 0-3 (was InvPot / InvPot2) and byte 5 (was InvRegenPreset) are FREE as of schema 3.0.
+#
+# Those three are on the boot-time removal list in UpgradeParameters(), so the inverter deletes
+# their map entries on every power cycle and the bytes can only ever read a constant zero. A
+# consumer decoding them would report a permanently released throttle and zero regen preset --
+# plausible, wrong, and indistinguishable from a real reading. Declaring nothing is strictly
+# better than declaring something that always lies. Confirmed on the car: the four entries were
+# re-added, saved (both "CANMAP stored" and "Parameters stored"), power cycled, and were gone.
+#
+# The raw ADC digits are not lost, only de-periodised: poll pot (id 2015) and pot2 (id 2016)
+# over SDO on 0x601/0x581. That is what InverterSdoReq/InverterSdoResp below are for.
+#
+# This removal is why schema 3.0 is a MAJOR bump. Nothing needs quarantining -- the signals only
+# ever carried zero -- but the rule is applied mechanically rather than argued away.
+#
 # The resolved throttle command, signed because regen is negative. throtmin/throtmax are -100
-# and 100, so an int8 covers the full range exactly.
+# and 100, so an int8 covers the full range exactly. This one survives, and it is the throttle
+# value that actually reflects what the inverter acted on.
 sig("InvPotNom", 32, 8, signed=True, lo=-100, hi=100, unit="%")
-sig("InvRegenPreset", 40, 8, hi=100, unit="%")
 # Byte 6 was going to be `dir`, but this firmware rejects that name -- it is not a spot value in
 # the build the car runs, whatever the newer param_prj.h snapshot says. Nothing is lost: the
 # commanded direction is already in 0x002 as InvIo_Fwd and InvIo_Rev, and the sign of InvPotNom
@@ -353,6 +387,29 @@ emit()
 msg(ID_VCU_CONTROL, "VcuControl", 8, tx="VCU", extended=False)
 sig("BmsLimit", 29, 1)
 emit()
+
+# ------------------------------------------------------------------ inverter SDO
+#
+# CANopen-style expedited request/response, the only route to parameters the periodic CAN map
+# cannot carry. Both frames are declared with their raw fields and paired in post-processing:
+# SDO is not periodic, and the 24-bit index/subIndex pair that selects the meaning is not
+# expressible as a DBC multiplexer.
+#
+# SdoData is declared SIGNED because a parameter read returns Param::Get(), which is s32fp --
+# fixed point with 5 fractional bits, i.e. the real value times 32 -- and regen values are
+# negative. The 1/32 scale is deliberately NOT applied as a DBC factor here: the same field
+# carries non-parameter payloads for other indices (CAN map records, string transfers, abort
+# codes), so scaling it globally would corrupt those. Apply the /32 in the consumer, keyed on
+# index/subIndex, and use an arithmetic shift or a signed divide -- >> 5 on an unsigned type
+# decodes every regen reading as roughly +134 million.
+for _ident, _name, _tx, _rx in ((ID_INVERTER_SDO_REQ, "InverterSdoReq", "VCU", "INVERTER"),
+                                (ID_INVERTER_SDO_RESP, "InverterSdoResp", "INVERTER", "LOGGER")):
+    msg(_ident, _name, 8, tx=_tx, extended=False)
+    sig("SdoCmd", 0, 8, rx=_rx)
+    sig("SdoIndex", 8, 16, rx=_rx)
+    sig("SdoSubIndex", 24, 8, rx=_rx)
+    sig("SdoData", 32, 32, signed=True, lo=-2147483648, hi=2147483647, rx=_rx)
+    emit()
 
 for n, ident in enumerate(ID_CHARGER_AC, start=1):
     msg(ident, "Charger%dAc" % n, 8, tx="CHARGER", extended=False)
@@ -480,6 +537,25 @@ comment_msg(ID_VCU_CONTROL,
             "its own frames. It must be echoed into the log deliberately at transmit request, "
             "which is evidence of intent rather than proof of arbitration success. Only "
             "BmsLimit is verified; the rest of the layout is not yet mapped.", extended=False)
+comment_msg(ID_INVERTER_SDO_REQ,
+            "SDO read request from the VCU to the inverter, 0x600 + nodeid. The VCU polls "
+            "pot (id 2015), pot2 (2016) and regenpreset (2051) round-robin, one outstanding at "
+            "a time, at 10 Hz while opmode is not Off and 1 Hz otherwise. Parameters are named "
+            "by unique ID -- index 0x2100 | (id >> 8), subIndex id & 0xFF -- and NOT by array "
+            "position under index 0x2000, because positions shift between firmware builds. "
+            "Transmitted by the VCU, so like 0x03F it is echoed into the log at transmit "
+            "request rather than received. A request with no matching reply before the next "
+            "poll is a dropped sample; it is visible in the log as a 0x601 with no 0x581 after "
+            "it, which is why no separate loss counter exists. Strictly a diagnostic path: SDO "
+            "has no sequence counter, no CRC and no timeout semantics, so nothing in the "
+            "control loop may depend on it.", extended=False)
+comment_msg(ID_INVERTER_SDO_RESP,
+            "SDO reply from the inverter, 0x580 + nodeid. The requested index and subIndex are "
+            "echoed, so a request and its reply pair exactly even if the reply is late. "
+            "SdoCmd 0x43 is a successful read; 0x80 is an abort, and then SdoData is the abort "
+            "code rather than a value -- 0x06020000 means the index is wrong for this firmware "
+            "build, which retrying cannot fix. For a parameter read SdoData is s32fp: divide by "
+            "32, signed.", extended=False)
 comment_sig(ID_CHARGER_AC[0], "Iac",
             "Comment in Main.cpp says 9 bits at bit 41, but the extraction reads 15 bits "
             "(data[5]>>1 plus data[6]<<7). Encoded here as the documented 9. Confirm the "
@@ -487,10 +563,20 @@ comment_sig(ID_CHARGER_AC[0], "Iac",
 
 emit()
 emit('VAL_ %d DiagCode 0 "None" 1 "PecFailure" 2 "BmsFault" 3 "ThreadStartFailure" '
-     '4 "InvalidMessage" ;' % (ID_DIAG | EXT))
+     '4 "InvalidMessage" 5 "SdoAbort" ;' % (ID_DIAG | EXT))
 # openinverter's own OPMODES and DIRS, verbatim from stm32-sine/param_prj.h.
 emit('VAL_ %d InvOpmode 0 "Off" 1 "Run" 2 "ManualRun" 3 "Boost" 4 "Buck" 5 "Sine" '
      '6 "AcHeat" ;' % ID_INVERTER_ST)
+# CanSdo's command bytes, composed from the CANopen bitfields in libopeninv/src/cansdo.cpp:
+# SDO_READ is 2<<5, SDO_READ_REPLY adds EXPEDITED (1<<1) and SIZE_SPECIFIED (1), SDO_WRITE is
+# 1<<5 with the same two, SDO_WRITE_REPLY is 3<<5. Only 0x40, 0x43 and 0x80 are produced by the
+# VCU's poll; the write commands are listed because the host-TX path can emit them.
+for _sdo_id in (ID_INVERTER_SDO_REQ, ID_INVERTER_SDO_RESP):
+    emit('VAL_ %d SdoCmd 64 "Read" 67 "ReadReply" 35 "Write" 96 "WriteReply" 128 "Abort" ;'
+         % _sdo_id)
+# The tri-state din_ocur / din_desat encoding, openinverter's own.
+for _tri in ("InvIo_Ocur", "InvIo_Desat"):
+    emit('VAL_ %d %s 0 "Error" 1 "Ok" 2 "na" ;' % (ID_INVERTER_ST, _tri))
 emit()
 
 # ---------------------------------------------------------------- schema identity

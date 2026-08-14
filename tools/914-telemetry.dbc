@@ -587,6 +587,7 @@ BO_ 2 InverterState: 8 INVERTER
  SG_ InvSts_PotPressed : 6|1@1+ (1,0) [0|1] "" LOGGER
  SG_ InvSts_TmpHs : 7|1@1+ (1,0) [0|1] "" LOGGER
  SG_ InvSts_WaitStart : 8|1@1+ (1,0) [0|1] "" LOGGER
+ SG_ InvSts_BrakeCheck : 9|1@1+ (1,0) [0|1] "" LOGGER
  SG_ InvOpmode : 16|8@1+ (1,0) [0|6] "" LOGGER
  SG_ InvIo_Cruise : 24|1@1+ (1,0) [0|1] "" LOGGER
  SG_ InvIo_Start : 25|1@1+ (1,0) [0|1] "" LOGGER
@@ -595,6 +596,10 @@ BO_ 2 InverterState: 8 INVERTER
  SG_ InvIo_Rev : 28|1@1+ (1,0) [0|1] "" LOGGER
  SG_ InvIo_Bms : 29|1@1+ (1,0) [0|1] "" LOGGER
  SG_ InvAuxVoltage : 32|8@1+ (0.1,0) [0|25.5] "V" LOGGER
+ SG_ InvIo_Ocur : 40|2@1+ (1,0) [0|2] "" LOGGER
+ SG_ InvIo_Desat : 42|2@1+ (1,0) [0|2] "" LOGGER
+ SG_ InvIo_MProt : 44|1@1+ (1,0) [0|1] "" LOGGER
+ SG_ InvIo_EmcyStop : 45|1@1+ (1,0) [0|1] "" LOGGER
 
 BO_ 3 InverterFoc: 8 INVERTER
  SG_ InvId : 0|16@1- (0.1,0) [-3276.8|3276.7] "A" LOGGER
@@ -603,14 +608,23 @@ BO_ 3 InverterFoc: 8 INVERTER
  SG_ InvAmp : 48|16@1+ (1,0) [0|65535] "dig" LOGGER
 
 BO_ 4 InverterThrottle: 8 INVERTER
- SG_ InvPot : 0|16@1+ (1,0) [0|65535] "dig" LOGGER
- SG_ InvPot2 : 16|16@1+ (1,0) [0|65535] "dig" LOGGER
  SG_ InvPotNom : 32|8@1- (1,0) [-100|100] "%" LOGGER
- SG_ InvRegenPreset : 40|8@1+ (1,0) [0|100] "%" LOGGER
  SG_ InvCpuLoad : 56|8@1+ (1,0) [0|100] "%" LOGGER
 
 BO_ 63 VcuControl: 8 VCU
  SG_ BmsLimit : 29|1@1+ (1,0) [0|1] "" LOGGER
+
+BO_ 1537 InverterSdoReq: 8 VCU
+ SG_ SdoCmd : 0|8@1+ (1,0) [0|255] "" INVERTER
+ SG_ SdoIndex : 8|16@1+ (1,0) [0|65535] "" INVERTER
+ SG_ SdoSubIndex : 24|8@1+ (1,0) [0|255] "" INVERTER
+ SG_ SdoData : 32|32@1- (1,0) [-2147483648|2147483647] "" INVERTER
+
+BO_ 1409 InverterSdoResp: 8 INVERTER
+ SG_ SdoCmd : 0|8@1+ (1,0) [0|255] "" LOGGER
+ SG_ SdoIndex : 8|16@1+ (1,0) [0|65535] "" LOGGER
+ SG_ SdoSubIndex : 24|8@1+ (1,0) [0|255] "" LOGGER
+ SG_ SdoData : 32|32@1- (1,0) [-2147483648|2147483647] "" LOGGER
 
 BO_ 519 Charger1Ac: 8 CHARGER
  SG_ Uac : 8|8@1+ (1,0) [0|255] "V" LOGGER
@@ -679,8 +693,14 @@ CM_ BO_ 2684354558 "Identifies the schema this stream was produced with, broadca
 CM_ BO_ 2684354559 "Not part of SLCAN. Counter gaps expose lost frames and the CRC16 over every byte since the previous integrity frame exposes substitutions that the frame's own length check misses. Other tools can ignore this id.";
 CM_ SG_ 1 InvDcVoltage "HV DC bus voltage. Scale is 0.1 V because the inverter's CAN map sends udc at gain 10 -- defined by that map entry, not inferred from a capture. Before 2026-08-10 nothing was mapped here at all and these bytes read zero.";
 CM_ BO_ 63 "Transmitted by the VCU, so the proxy never receives it -- a CAN node does not see its own frames. It must be echoed into the log deliberately at transmit request, which is evidence of intent rather than proof of arbitration success. Only BmsLimit is verified; the rest of the layout is not yet mapped.";
+CM_ BO_ 1537 "SDO read request from the VCU to the inverter, 0x600 + nodeid. The VCU polls pot (id 2015), pot2 (2016) and regenpreset (2051) round-robin, one outstanding at a time, at 10 Hz while opmode is not Off and 1 Hz otherwise. Parameters are named by unique ID -- index 0x2100 | (id >> 8), subIndex id & 0xFF -- and NOT by array position under index 0x2000, because positions shift between firmware builds. Transmitted by the VCU, so like 0x03F it is echoed into the log at transmit request rather than received. A request with no matching reply before the next poll is a dropped sample; it is visible in the log as a 0x601 with no 0x581 after it, which is why no separate loss counter exists. Strictly a diagnostic path: SDO has no sequence counter, no CRC and no timeout semantics, so nothing in the control loop may depend on it.";
+CM_ BO_ 1409 "SDO reply from the inverter, 0x580 + nodeid. The requested index and subIndex are echoed, so a request and its reply pair exactly even if the reply is late. SdoCmd 0x43 is a successful read; 0x80 is an abort, and then SdoData is the abort code rather than a value -- 0x06020000 means the index is wrong for this firmware build, which retrying cannot fix. For a parameter read SdoData is s32fp: divide by 32, signed.";
 CM_ SG_ 519 Iac "Comment in Main.cpp says 9 bits at bit 41, but the extraction reads 15 bits (data[5]>>1 plus data[6]<<7). Encoded here as the documented 9. Confirm the upper bits are always zero.";
 
-VAL_ 2667577584 DiagCode 0 "None" 1 "PecFailure" 2 "BmsFault" 3 "ThreadStartFailure" 4 "InvalidMessage" ;
+VAL_ 2667577584 DiagCode 0 "None" 1 "PecFailure" 2 "BmsFault" 3 "ThreadStartFailure" 4 "InvalidMessage" 5 "SdoAbort" ;
 VAL_ 2 InvOpmode 0 "Off" 1 "Run" 2 "ManualRun" 3 "Boost" 4 "Buck" 5 "Sine" 6 "AcHeat" ;
+VAL_ 1537 SdoCmd 64 "Read" 67 "ReadReply" 35 "Write" 96 "WriteReply" 128 "Abort" ;
+VAL_ 1409 SdoCmd 64 "Read" 67 "ReadReply" 35 "Write" 96 "WriteReply" 128 "Abort" ;
+VAL_ 2 InvIo_Ocur 0 "Error" 1 "Ok" 2 "na" ;
+VAL_ 2 InvIo_Desat 0 "Error" 1 "Ok" 2 "na" ;
 
