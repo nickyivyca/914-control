@@ -60,6 +60,7 @@ target_sources(${APP_TARGET}
         src/MCP23017.cpp
         src/Slcan.cpp
         src/Telemetry.cpp
+        src/InverterSdo.cpp
 )
 
 # mbed-os / mbed-baremetal are object libraries and may only be linked to executables.

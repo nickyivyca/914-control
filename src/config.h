@@ -203,6 +203,54 @@
 #define SLCAN_HOST_TX 0
 #endif
 
+// Poll the inverter for parameters the periodic CAN map cannot carry, over openinverter's SDO
+// server. See src/InverterSdo.h for the protocol and notes/inverter-sdo-polling.md for why this
+// is the only route to the raw throttle ADC digits: stm32-sine's UpgradeParameters() deletes the
+// map entries for pot, pot2, canio, cruisespeed and regenpreset on every boot, and CanMap::Remove()
+// is direction-blind, so even a transmit-only telemetry mapping is collateral damage.
+//
+// Defaults to SLCAN_MODE, i.e. it polls only in builds that can actually record the answer. The
+// CSV has no field for these values, so polling in a CSV build would put 60 frames/s on the
+// vehicle bus for data that goes nowhere.
+//
+// READ-ONLY BY CONSTRUCTION: this module emits SDO_READ and nothing else -- there is no write
+// path in it. That matters because SDO *writes* can change inverter parameters, potmode among
+// them, and can be persisted to flash. Reads cannot.
+//
+// Turn this off if something else is talking SDO to node 1 at the same time (openinv-client over
+// the ESP32 link, say). Expedited parameter reads are stateless and pair by echoed index, so the
+// two interleave harmlessly, but the multi-frame transfers -- `can list`, string reads on index
+// 0x5001 -- do hold server state that a concurrent request can disturb.
+#ifndef INVERTER_SDO_POLL
+#define INVERTER_SDO_POLL SLCAN_MODE
+#endif
+
+// openinverter node id. Sets the SDO request/reply pair to 0x600+n / 0x580+n. CanSdo defaults
+// this to 1 and nothing on this car changes it.
+#ifndef INVERTER_NODE_ID
+#define INVERTER_NODE_ID 1
+#endif
+
+// Poll interval while the inverter reports opmode != Off, in ms. The throttle values only matter
+// while driving. Three values round-robin at this rate is 30 requests/s plus 30 replies, against
+// a measured ~80 frames/s of existing bus traffic.
+#ifndef INVERTER_SDO_PERIOD_ACTIVE_MS
+#define INVERTER_SDO_PERIOD_ACTIVE_MS 100
+#endif
+
+// Poll interval while opmode is Off, in ms. Slow enough not to spend bus on a parked car, fast
+// enough that the path is proven working before it is needed.
+#ifndef INVERTER_SDO_PERIOD_IDLE_MS
+#define INVERTER_SDO_PERIOD_IDLE_MS 1000
+#endif
+
+// How long the last opmode reading from 0x002 stays trusted, in ms. Past this the rate falls
+// back to the idle tier. Without it, an inverter that goes quiet mid-drive would leave the poll
+// latched at 10 Hz forever -- the stale value has to expire rather than persist.
+#ifndef INVERTER_STATE_STALE_MS
+#define INVERTER_STATE_STALE_MS 1000
+#endif
+
 // BENCH ONLY -- never build this for the car. Puts the CAN controller into self-test mode
 // (LPC17xx CANMOD bit 2), where can_write() issues a Self Reception Request instead of a normal
 // transmit: the frame needs no acknowledge from another node and is delivered straight back to

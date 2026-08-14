@@ -21,6 +21,7 @@
 
 #include "Slcan.h"
 #include "Telemetry.h"
+#include "InverterSdo.h"
 
 #include "MovingAverage.h"
 
@@ -238,6 +239,11 @@ int main() {
         slcan_emit(msg.id, msg.data, msg.len, msg.format == CANExtended);
 #endif
 
+        // After the forward, so a frame reaches the log whatever this does with it. Picks out
+        // opmode from 0x002 to set the poll rate, and SDO replies on 0x581 to close a request.
+        // Compiled out entirely unless INVERTER_SDO_POLL.
+        inverter_sdo_on_frame(msg);
+
         switch(msg.id) {
           case 1:
             // Inverter data
@@ -297,6 +303,12 @@ int main() {
     // Host -> bus. Polled once per MAIN_PERIOD, so a host command is acted on within 50 ms --
     // far inside the timeouts python-can and openinverter-can-tool use for SDO transfers.
     slcan_poll_input();
+
+    // VCU -> inverter SDO poll: the only route to the raw throttle ADC digits, which the
+    // inverter deletes from its CAN map on every boot. Paced off this loop, so it runs after the
+    // receive queue has been drained and any reply to the previous request has already been
+    // paired. Diagnostic only -- nothing in the control loop depends on it. See InverterSdo.h.
+    inverter_sdo_tick();
 
     //print_cpu_stats();
 

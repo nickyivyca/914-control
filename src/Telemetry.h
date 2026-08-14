@@ -112,6 +112,11 @@ enum BmsDiagCode : uint8_t {
   BMS_DIAG_BMS_FAULT       = 2,
   BMS_DIAG_THREAD_START    = 3,
   BMS_DIAG_INVALID_MESSAGE = 4,
+  // The inverter aborted an SDO read. arg1 is the parameter id that was asked for, arg2/arg3 are
+  // the low and high halves of the abort code (0x06020000 = no such index in this build). Emitted
+  // once per parameter, because that id is then dropped from the poll rotation -- an abort is a
+  // statement about the firmware on the other end, and retrying cannot change it.
+  BMS_DIAG_SDO_ABORT       = 5,
 };
 
 // ---------------------------------------------------------------- status frame inputs
