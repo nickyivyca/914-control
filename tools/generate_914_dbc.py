@@ -42,7 +42,7 @@ import sys
 # Bump MAJOR when an existing signal moves, changes scaling, or a message id changes -- an old
 # consumer would decode wrongly. Bump MINOR when signals or messages are only added -- an old
 # consumer decodes everything it knows and simply misses the new data.
-SCHEMA_MAJOR = 2
+SCHEMA_MAJOR = 3
 SCHEMA_MINOR = 0
 
 NUM_CELLS = 168          # NUM_CHIPS * NUM_CELLS_PER_CHIP
@@ -294,10 +294,8 @@ sig("InvHeatsinkTemp", 16, 16, signed=True, factor=0.1, lo=-3276.8, hi=3276.7, u
 sig("InvRpm", 32, 16, unit="rpm")
 emit()
 
-# Inverter state. NOT transmitted yet -- this frame does not exist on the bus until four
-# `can tx` entries are added to the inverter's map (see can-id-allocation.md). Declared now for
-# the same reason as the GPIO input byte: so the map does not have to be renumbered later, and
-# so the decode is ready the moment the entries are added.
+# Inverter state. Live on the bus since 2026-08-13; the map entries backing every signal here
+# are applied and saved (see can-id-allocation.md).
 #
 # A second frame rather than the spare bytes of 0x001, for two reasons. `status` is 9 bits and
 # only one byte of 0x001 is free, and those "free" bytes read zero in a capture taken with the
@@ -309,20 +307,41 @@ emit()
 # can be set at once, and a value table would decode 0x11 as an unknown enum rather than as
 # UdcLow plus EmcyStop.
 msg(ID_INVERTER_ST, "InverterState", 8, tx="INVERTER", extended=False)
+# BrakeCheck (bit 9) was missing until 2026-08-13. It is not hypothetical: the car read
+# status = 516 = BrakeCheck | UdcBelowUdcSw at rest, so the old DBC was silently dropping a bit
+# that was actually set.
 INV_STATUS = ("UdcLow", "UdcHigh", "UdcBelowUdcSw", "UdcLim", "EmcyStop",
-              "MProt", "PotPressed", "TmpHs", "WaitStart")
+              "MProt", "PotPressed", "TmpHs", "WaitStart", "BrakeCheck")
 for i, s in enumerate(INV_STATUS):
     sig("InvSts_%s" % s, i, 1)
 sig("InvOpmode", 16, 8, hi=6)
-# canio is what the inverter believes it received over CAN. InvIo_Bms is the receive side of
-# BmsLimit in 0x03F: the VCU's command and the inverter's reception of it, logged separately.
+# These six were sourced from `canio` until 2026-08-13. They could not stay that way: the
+# firmware deletes the `canio` map entry on every boot (stm32_sine.cpp, UpgradeParameters),
+# because canio is the payload of the CRC-and-counter-protected control frame on 0x03F and the
+# generic CanMap has no such protection. CanMap::Remove() takes no direction argument, so a
+# transmit-only mapping is deleted along with any receive one.
+#
+# They are now sourced from the `din_*` spot values, which are NOT on that removal list. Bit
+# positions are unchanged and deliberately so -- din_* is the same six inputs in the same canio
+# order, so no consumer has to move. The meaning widens: each din_* is the OR of the physical
+# pin and the canio bit, i.e. the inverter's *effective* input rather than only what it received
+# over CAN. On this car the physical pins for Brake and Bms read 0, so those two remain a
+# faithful echo of what the VCU commanded in 0x03F. Fwd does not: it sits high on a real wire.
 INV_CANIO = ("Cruise", "Start", "Brake", "Fwd", "Rev", "Bms")
 for i, s in enumerate(INV_CANIO):
     sig("InvIo_%s" % s, 24 + i, 1)
 sig("InvAuxVoltage", 32, 8, factor=0.1, hi=25.5, unit="V")
+# Two bits each, not one: din_ocur and din_desat are tri-state, 0=Error 1=Ok 2=na, where "na"
+# is what a board that does not wire them reports. hwver is MiniMainboard here, which does.
+sig("InvIo_Ocur", 40, 2, hi=2)
+sig("InvIo_Desat", 42, 2, hi=2)
+# The raw pin states, distinct from InvSts_MProt / InvSts_EmcyStop above: those are the
+# inverter's latched error view, these are what the input reads right now.
+sig("InvIo_MProt", 44, 1)
+sig("InvIo_EmcyStop", 45, 1)
 emit()
 
-# Also not transmitted yet. Signed fields are declared signed here with a POSITIVE length in the
+# Live since 2026-08-13. Signed fields are declared signed here with a POSITIVE length in the
 # map: openinverter's CanMap does `int ival = physical*gain + offset; ival &= (1<<numBits)-1`, so
 # a negative value lands as two's complement in the field and a signed DBC signal reads it back.
 # A *negative* length in the map means big-endian, not signed -- and is unusable on the send
@@ -335,14 +354,20 @@ sig("InvAmp", 48, 16, unit="dig")
 emit()
 
 msg(ID_INVERTER_THR, "InverterThrottle", 8, tx="INVERTER", extended=False)
-# Raw ADC digits. The saved parameters bound them: potmin 240 / potmax 1520, pot2min 475 /
-# pot2max 3000, so 16 bits is generous and a reading outside those bounds is itself a signal.
-sig("InvPot", 0, 16, unit="dig")
-sig("InvPot2", 16, 16, unit="dig")
+# InvPot (0|16), InvPot2 (16|16) and InvRegenPreset (40|8) were declared here until 2026-08-13
+# and are now GONE -- this is the breaking half of the MAJOR bump to 3. pot, pot2 and
+# regenpreset are on the same UpgradeParameters() removal list as canio, so their map entries
+# cannot survive a boot and those bytes would have read a constant zero forever. An old
+# consumer decoding this frame would have reported a permanently released throttle, which is
+# worse than reporting nothing.
+#
+# The raw ADC digits are still reachable, just not periodically: read pot (id 2015) and pot2
+# (id 2016) over SDO. See inverter-sdo-polling.md in the notes hub. Bytes 0-3, 5 and 6 are free.
+#
 # The resolved throttle command, signed because regen is negative. throtmin/throtmax are -100
-# and 100, so an int8 covers the full range exactly.
+# and 100, so an int8 covers the full range exactly. This one survives: potnom is not on the
+# removal list, and it is the throttle value that actually reflects what the inverter acted on.
 sig("InvPotNom", 32, 8, signed=True, lo=-100, hi=100, unit="%")
-sig("InvRegenPreset", 40, 8, hi=100, unit="%")
 # Byte 6 was going to be `dir`, but this firmware rejects that name -- it is not a spot value in
 # the build the car runs, whatever the newer param_prj.h snapshot says. Nothing is lost: the
 # commanded direction is already in 0x002 as InvIo_Fwd and InvIo_Rev, and the sign of InvPotNom

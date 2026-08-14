@@ -587,6 +587,7 @@ BO_ 2 InverterState: 8 INVERTER
  SG_ InvSts_PotPressed : 6|1@1+ (1,0) [0|1] "" LOGGER
  SG_ InvSts_TmpHs : 7|1@1+ (1,0) [0|1] "" LOGGER
  SG_ InvSts_WaitStart : 8|1@1+ (1,0) [0|1] "" LOGGER
+ SG_ InvSts_BrakeCheck : 9|1@1+ (1,0) [0|1] "" LOGGER
  SG_ InvOpmode : 16|8@1+ (1,0) [0|6] "" LOGGER
  SG_ InvIo_Cruise : 24|1@1+ (1,0) [0|1] "" LOGGER
  SG_ InvIo_Start : 25|1@1+ (1,0) [0|1] "" LOGGER
@@ -595,6 +596,10 @@ BO_ 2 InverterState: 8 INVERTER
  SG_ InvIo_Rev : 28|1@1+ (1,0) [0|1] "" LOGGER
  SG_ InvIo_Bms : 29|1@1+ (1,0) [0|1] "" LOGGER
  SG_ InvAuxVoltage : 32|8@1+ (0.1,0) [0|25.5] "V" LOGGER
+ SG_ InvIo_Ocur : 40|2@1+ (1,0) [0|2] "" LOGGER
+ SG_ InvIo_Desat : 42|2@1+ (1,0) [0|2] "" LOGGER
+ SG_ InvIo_MProt : 44|1@1+ (1,0) [0|1] "" LOGGER
+ SG_ InvIo_EmcyStop : 45|1@1+ (1,0) [0|1] "" LOGGER
 
 BO_ 3 InverterFoc: 8 INVERTER
  SG_ InvId : 0|16@1- (0.1,0) [-3276.8|3276.7] "A" LOGGER
@@ -603,10 +608,7 @@ BO_ 3 InverterFoc: 8 INVERTER
  SG_ InvAmp : 48|16@1+ (1,0) [0|65535] "dig" LOGGER
 
 BO_ 4 InverterThrottle: 8 INVERTER
- SG_ InvPot : 0|16@1+ (1,0) [0|65535] "dig" LOGGER
- SG_ InvPot2 : 16|16@1+ (1,0) [0|65535] "dig" LOGGER
  SG_ InvPotNom : 32|8@1- (1,0) [-100|100] "%" LOGGER
- SG_ InvRegenPreset : 40|8@1+ (1,0) [0|100] "%" LOGGER
  SG_ InvCpuLoad : 56|8@1+ (1,0) [0|100] "%" LOGGER
 
 BO_ 63 VcuControl: 8 VCU
