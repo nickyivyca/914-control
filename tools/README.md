@@ -33,15 +33,28 @@ The notes hub keeps its own copies, because `telemetry_encoding_check.py` and
 `<notes>` is machine-specific -- the hub is on a SeaDrive remote whose root differs per
 computer. See `git-repo-paths.md` there.
 
-A third copy lives in the `reverse-it` workspace at `projects/914/914-telemetry.dbc`, where the
-Android app module reads it. No schema header is needed there -- the app checks the broadcast
-hash against the DBC it loaded:
+Two more copies live in the `reverse-it` workspace. No schema header is needed for either -- a
+consumer checks the broadcast hash against the `SCHEMA_HASH=` stamp in the DBC's own `CM_` file
+comment:
 
     py -3.12 tools/generate_914_dbc.py > <reverse-it>/projects/914/914-telemetry.dbc
+    py -3.12 tools/generate_914_dbc.py \
+        > <reverse-it>/android-app/CanLoggerApps/p914/src/main/assets/live-display/dbcs/vcu.dbc
 
-Regenerate all of them together. A schema hash that differs between the header compiled into
-the firmware and the DBC a decoder loaded is exactly the condition the broadcast is meant to
-surface, and it is not worth discovering from a capture.
+**The second of those is the one the app actually loads at runtime.** `projects/914/` is a
+reference copy in a stub project directory; the shipped asset is `vcu.dbc` under `:p914`. An
+earlier version of this file said the app read `projects/914/914-telemetry.dbc`, which was never
+true once the module was built -- corrected 2026-08-15.
+
+**Four destinations, and they must be regenerated together.** A schema hash that differs between
+the header compiled into the firmware and the DBC a decoder loaded is exactly the condition the
+broadcast is meant to surface, and it is not worth discovering from a capture.
+
+The failure mode is now worse than a stale decode, which is why the list above matters more than
+it used to: since the DBC carries its own hash, a copy left un-regenerated makes the app report a
+**false quarantine** -- it blanks the display and blames the firmware, when the only thing wrong
+is that one of these four files was skipped. Check with `schema_stamp_verify.py` in the notes
+hub, which compares the stamp against the header and can decode `SchemaId` out of a capture.
 
 ## Python
 
