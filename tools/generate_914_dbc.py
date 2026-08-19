@@ -42,7 +42,11 @@ import sys
 # Bump MAJOR when an existing signal moves, changes scaling, or a message id changes -- an old
 # consumer would decode wrongly. Bump MINOR when signals or messages are only added -- an old
 # consumer decodes everything it knows and simply misses the new data.
-SCHEMA_MAJOR = 3
+# 4.0 (2026-08-18): InvIq scaling negated, so the torque-producing current reads positive when
+# the car drives forward. MAJOR, not MINOR, and the rule above is why -- an old consumer decoding
+# with factor +0.1 gets a plausible, correctly-scaled, wrong-signed number. That is precisely the
+# "plausible wrong numbers rather than an error" case the SchemaId comment reserves quarantine for.
+SCHEMA_MAJOR = 4
 SCHEMA_MINOR = 0
 
 NUM_CELLS = 168          # NUM_CHIPS * NUM_CELLS_PER_CHIP
@@ -352,7 +356,21 @@ emit()
 # side anyway, because that same masking line shifts by a negative count.
 msg(ID_INVERTER_FOC, "InverterFoc", 8, tx="INVERTER", extended=False)
 sig("InvId", 0, 16, signed=True, factor=0.1, lo=-3276.8, hi=3276.7, unit="A")
-sig("InvIq", 16, 16, signed=True, factor=0.1, lo=-3276.8, hi=3276.7, unit="A")
+# NEGATIVE factor. The motor is installed turning the opposite way to the inverter's own
+# convention, so the torque-producing current reads negative when the car drives forward. The sign
+# is corrected here, once, rather than in every consumer: a log, a cantools session and the
+# display would otherwise each have to remember to flip it, and one of them eventually would not.
+#
+# id is deliberately NOT flipped. Reversing rotation inverts the torque axis, not the flux axis --
+# borne out by the 2026-08-18 drive log, where id sits symmetrically about zero (-74.4 .. +50.6 A)
+# with no directional bias while iq is one-sided.
+#
+# ifw is NOT flipped either, and must not be: field weakening is negative d-axis current by
+# convention, not because of this car. stm32-sine defines `fwcurmax` over [-1000, 0] with a
+# default of -100 (`param_prj.h:58`), so ifw can only ever be <= 0 and a positive reading would be
+# meaningless. The display negates it for plotting and labels that axis "-ifw"; the wire value
+# stays honest.
+sig("InvIq", 16, 16, signed=True, factor=-0.1, lo=-3276.8, hi=3276.7, unit="A")
 sig("InvIfw", 32, 16, signed=True, factor=0.1, lo=-3276.8, hi=3276.7, unit="A")
 sig("InvAmp", 48, 16, unit="dig")
 emit()
