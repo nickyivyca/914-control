@@ -153,6 +153,14 @@ extern IsrSafeCAN* canBus;
 #define PIN_ANALOG_KNOB2 p16
 #endif
 
+// p15, p16 and p20 are the only analog pins free on this board. The LPC1768 exposes six
+// (p15-p20) and p17/p18/p19 are already the charge, brake and reverse digital inputs, so the
+// three dash knobs can only be on these three. Which physical knob is on which of them is a
+// separate question, and one the bring-up capture answers.
+#ifndef PIN_ANALOG_KNOB3
+#define PIN_ANALOG_KNOB3 p20
+#endif
+
 extern DigitalOut* led1;
 extern DigitalOut* led2;
 extern DigitalOut* led3;
@@ -170,6 +178,8 @@ extern DigitalIn* DI_BrakeSwitch;
 extern DigitalIn* DI_ReverseSwitch;
 
 extern AnalogIn* knob1;
+extern AnalogIn* knob2;
+extern AnalogIn* knob3;
 
 extern MCP23017* ioexp;
 
@@ -223,4 +233,16 @@ extern PwmOut* fuelgauge;
 
 #ifndef MCP_BMS_THREAD_READ_MASK
 #define MCP_BMS_THREAD_READ_MASK (MCP_PIN_BIT(MCP_PIN_KNOB1SW) | MCP_PIN_BIT(MCP_PIN_KNOB2SW))
+#endif
+
+// Every pin the MCP23017 is actually configured to read, which is wider than the two the knob
+// switches are believed to be on. Main.cpp calls config(0b1111100000000000, ...), making pins
+// 11-15 inputs, with the 100k pullups enabled on 11 and 12 only.
+//
+// Bring-up reads all five rather than the two, because "the switch is not on the pin we expected"
+// and "the switch is on the pin we expected and open" are the same reading through the narrow
+// mask. Pins 13-15 have no pullup and will float, so treat them as suspect unless they track a
+// switch cleanly.
+#ifndef MCP_BMS_THREAD_READ_MASK_ALL
+#define MCP_BMS_THREAD_READ_MASK_ALL 0xF800
 #endif

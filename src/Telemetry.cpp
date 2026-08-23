@@ -87,6 +87,17 @@ void telemetry_emit_status(const BmsStatusFields &f)
     slcan_emit(TLM_ID_STATUS, p, 8, true);
 }
 
+void telemetry_emit_knobs(const BmsKnobFields &f)
+{
+    uint8_t p[8];
+    put_u16(&p[0], f.knob1Raw);
+    put_u16(&p[2], f.knob2Raw);
+    put_u16(&p[4], f.knob3Raw);
+    p[6] = f.gpiPortB;
+    p[7] = f.gpiMask;
+    slcan_emit(TLM_ID_KNOBS, p, 8, true);
+}
+
 void telemetry_emit_pack(const batterydata_t &d)
 {
     uint8_t p[8];

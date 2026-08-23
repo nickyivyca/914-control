@@ -1150,7 +1150,14 @@ void BMSThread::threadWorker() {
         | (uint8_t)((voltagecheckOK                           ? 1u : 0u) << BMS_STATUS_VCHECK_OK)
         | (uint8_t)((stringcheckOK                            ? 1u : 0u) << BMS_STATUS_STRINGCHECK_OK);
       sf.ioexpOut = (uint8_t)(ioexp_bits & 0xFF);
-#if TELEMETRY_READ_GPIO_INPUTS
+#if TELEMETRY_EMIT_KNOBS
+      // The knob build reads the whole configured input range, not just the two pins the
+      // switches are believed to be on, and shares the one I2C read with the status frame
+      // below rather than doing a second.
+      const uint8_t gpiPortB =
+          (uint8_t)((ioexp->read_mask(MCP_BMS_THREAD_READ_MASK_ALL) >> 8) & 0xFF);
+      sf.ioexpIn = gpiPortB;
+#elif TELEMETRY_READ_GPIO_INPUTS
       // MCP23017 port B, pin 8+n in bit n.
       sf.ioexpIn = (uint8_t)((ioexp->read_mask(MCP_BMS_THREAD_READ_MASK) >> 8) & 0xFF);
 #else
@@ -1158,6 +1165,18 @@ void BMSThread::threadWorker() {
 #endif
       sf.errCount = errCount;
       telemetry_emit_status(sf);
+
+#if TELEMETRY_EMIT_KNOBS
+      {
+        BmsKnobFields kf;
+        kf.knob1Raw = knob1->read_u16();
+        kf.knob2Raw = knob2->read_u16();
+        kf.knob3Raw = knob3->read_u16();
+        kf.gpiPortB = gpiPortB;
+        kf.gpiMask  = (uint8_t)((MCP_BMS_THREAD_READ_MASK_ALL >> 8) & 0xFF);
+        telemetry_emit_knobs(kf);
+      }
+#endif
     }
 
     // Schema identity at 1 Hz in both rate modes, since m_frequency is the scan rate. A

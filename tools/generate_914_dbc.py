@@ -42,6 +42,8 @@ import sys
 # Bump MAJOR when an existing signal moves, changes scaling, or a message id changes -- an old
 # consumer would decode wrongly. Bump MINOR when signals or messages are only added -- an old
 # consumer decodes everything it knows and simply misses the new data.
+# 4.2 (2026-08-23): BmsKnobs, the dash-knob bring-up frame. Emitted only by a build with
+# TELEMETRY_EMIT_KNOBS set, so a normal capture simply will not contain it. MINOR: additive.
 # 4.1 (2026-08-22): the charger's own RX map transcribed -- Tesla module state, DC and
 # temperatures, the two signals missing from the AC frames, and the VCU's two command frames.
 # MINOR: every existing signal decodes exactly as before, an old consumer just misses the new
@@ -51,7 +53,7 @@ import sys
 # with factor +0.1 gets a plausible, correctly-scaled, wrong-signed number. That is precisely the
 # "plausible wrong numbers rather than an error" case the SchemaId comment reserves quarantine for.
 SCHEMA_MAJOR = 4
-SCHEMA_MINOR = 1
+SCHEMA_MINOR = 2
 
 NUM_CELLS = 168          # NUM_CHIPS * NUM_CELLS_PER_CHIP
 CELLS_IN_SERIES = 84     # NUM_CHIPS * NUM_CELLS_PER_CHIP / NUM_STRINGS -- two parallel strings
@@ -72,6 +74,7 @@ ID_STATUS      = 0x1F000000
 ID_PACK        = 0x1F000001
 ID_CELL_SUM    = 0x1F000002
 ID_TEMP_SUM    = 0x1F000003
+ID_KNOBS       = 0x1F000004
 ID_CELL_BASE   = 0x1F000010
 ID_THERM_BASE  = 0x1F000040
 ID_DIE_BASE    = 0x1F000050
@@ -553,6 +556,24 @@ _f, _o = inv_gain(5)
 sig("ChademoOpmode", 40, 3, factor=_f, offset=_o, hi=1)
 emit()
 
+# ------------------------------------------------------------------- knob bring-up (0x1F000004)
+
+# Only a TELEMETRY_EMIT_KNOBS build emits this. Raw ADC counts on purpose: the frame exists to
+# find where a stepped pot's detents actually sit, and scaling to a percentage would bake in an
+# assumption about the travel that has not been measured.
+msg(ID_KNOBS, "BmsKnobs", 8)
+sig("Knob1Raw", 0, 16)
+sig("Knob2Raw", 16, 16)
+sig("Knob3Raw", 32, 16)
+# MCP23017 port B, bit n = pin 8+n. Pins 11-15 are inputs; 11 and 12 have 100k pullups, so a
+# switch pulling to ground reads 0 closed and 1 open. 13-15 have no pullup and float.
+for _bit, _pin in enumerate(range(8, 16)):
+    sig("Gpi_P%d" % _pin, 48 + _bit, 1, hi=1)
+# Which bits of the byte above were actually read. Without it a 0 bit is ambiguous between
+# "switch closed" and "pin never sampled" -- the same trap the BmsStatus IoexpMask exists for.
+sig("GpiMask", 56, 8)
+emit()
+
 # ------------------------------------------------- VCU -> charger commands (0x102, 0x103)
 
 # Everything the charger receives here goes through CanMap::HandleRx -> Param::Set, which ignores
@@ -669,6 +690,11 @@ comment_msg(ID_INVERTER_SDO_RESP,
             "code rather than a value -- 0x06020000 means the index is wrong for this firmware "
             "build, which retrying cannot fix. For a parameter read SdoData is s32fp: divide by "
             "32, signed.", extended=False)
+comment_msg(ID_KNOBS,
+            "Dash knob bring-up. Knob1Raw/Knob2Raw/Knob3Raw are AnalogIn::read_u16() on p15, "
+            "p16 and p20 -- the only three analog pins free on this board, since p17-p19 are the "
+            "charge, brake and reverse inputs. Which physical knob sits on which channel is what "
+            "the capture is for, so do not assume the numbering means anything yet.")
 comment_sig(ID_CHARGER_AC[0], "Iac",
             "9 bits at bit 41, spanning byte 5 bits 1-7 and byte 6 bits 0-1. Main.cpp used to "
             "read 15 bits here (data[5]>>1 plus data[6]<<7), taking six bits above the field "

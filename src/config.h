@@ -158,6 +158,19 @@
 #define TELEMETRY_READ_GPIO_INPUTS 0
 #endif
 
+// Emit the BmsKnobs frame: the three analog dash knobs and the MCP23017 input port, once per
+// cell-sense scan. Bring-up instrumentation for the charger termination and module knobs -- the
+// knobs have been removed and refitted since any code read them, so which knob is on which of
+// p15/p16/p20, and which MCP pin each switch landed on, are both unknown and must be measured
+// rather than assumed.
+//
+// Off by default. Costs one frame per scan plus an I2C read; turn it on for a knob capture with
+// -DCONFIG_DEFINES="TELEMETRY_EMIT_KNOBS=1". It forces the GPIO read on regardless of
+// TELEMETRY_READ_GPIO_INPUTS, since a knob capture without the switches is only half the answer.
+#ifndef TELEMETRY_EMIT_KNOBS
+#define TELEMETRY_EMIT_KNOBS 0
+#endif
+
 // Replace real telemetry with a deterministic function of a free-running frame counter. This is
 // the link instrument, not a telemetry mode: it is what separates three outcomes that look
 // identical in a log -- frames that never arrived, frames rejected as malformed, and frames

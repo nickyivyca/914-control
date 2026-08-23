@@ -35,6 +35,7 @@
 #define TLM_ID_PACK        0x1F000001u
 #define TLM_ID_CELL_SUM    0x1F000002u
 #define TLM_ID_TEMP_SUM    0x1F000003u
+#define TLM_ID_KNOBS       0x1F000004u
 #define TLM_ID_CELL_BASE   0x1F000010u
 #define TLM_ID_THERM_BASE  0x1F000040u
 #define TLM_ID_DIE_BASE    0x1F000050u
@@ -121,6 +122,22 @@ enum BmsDiagCode : uint8_t {
 
 // ---------------------------------------------------------------- status frame inputs
 
+// ---------------------------------------------------------------- knob bring-up frame
+
+// The three dash knobs and the MCP23017 input port, raw. Emitted only when TELEMETRY_EMIT_KNOBS
+// is set, which is a bring-up build rather than a mode the car runs in.
+//
+// Raw ADC counts, not percentages: the whole point is to find where the detents of a stepped pot
+// actually sit, and a scaled value bakes in an assumption about the travel that has not been
+// measured yet.
+struct BmsKnobFields {
+  uint16_t knob1Raw;    // p15
+  uint16_t knob2Raw;    // p16
+  uint16_t knob3Raw;    // p20
+  uint8_t  gpiPortB;    // MCP23017 port B, bit n = pin 8+n
+  uint8_t  gpiMask;     // which of those bits were actually read, so 0 means "open", not "unread"
+};
+
 struct BmsStatusFields {
   uint8_t  faultLatched;
   uint8_t  faultNow;
@@ -135,6 +152,7 @@ struct BmsStatusFields {
 #if SLCAN_MODE
 
 void telemetry_emit_status(const BmsStatusFields &f);
+void telemetry_emit_knobs(const BmsKnobFields &f);
 void telemetry_emit_pack(const batterydata_t &d);
 void telemetry_emit_cell_summary(const batterysummary_t &s);
 void telemetry_emit_temp_summary(const batterysummary_t &s, int16_t heatsinkTempDegC);
