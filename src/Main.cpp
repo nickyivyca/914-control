@@ -270,8 +270,10 @@ int main() {
           case 519: // Charger 1 AC data
             {
               c1uac = msg.data[1];
-              // iac is at bit 41, 9 bits long, scale 0.066666.... (1/15)
-              c1iac = (((uint16_t)(msg.data[5] >> 1)) + (((uint16_t)msg.data[6]) << 7))/15;
+              // iac is at bit 41, 9 bits long, scale 0.066666.... (1/15) -- byte 5 bits 1-7 plus
+              // byte 6 bits 0-1. Mask byte 6: the bits above the field are not mapped to
+              // anything in the charger, so letting them through corrupts the reading.
+              c1iac = (((uint16_t)(msg.data[5] >> 1)) | (((uint16_t)(msg.data[6] & 0x03)) << 7))/15;
               sendChargerInfo();
               // printf("Received Charger 1 AC data %d %x %x\n", c1iac, msg.data[5], msg.data[6]);
               break;
@@ -280,8 +282,10 @@ int main() {
             {
 
               c2uac = msg.data[1];
-              // iac is at bit 41, 9 bits long, scale 0.066666.... (1/15)
-              c2iac = (((uint16_t)(msg.data[5] >> 1)) + (((uint16_t)msg.data[6]) << 7))/15;
+              // iac is at bit 41, 9 bits long, scale 0.066666.... (1/15) -- byte 5 bits 1-7 plus
+              // byte 6 bits 0-1. Mask byte 6: the bits above the field are not mapped to
+              // anything in the charger, so letting them through corrupts the reading.
+              c2iac = (((uint16_t)(msg.data[5] >> 1)) | (((uint16_t)(msg.data[6] & 0x03)) << 7))/15;
               sendChargerInfo();
               // printf("Received Charger 2 AC data %d \n", c2iac);
               break;
@@ -289,8 +293,10 @@ int main() {
           case 523: // Charger 3 AC data
             {
               c3uac = msg.data[1];
-              // iac is at bit 41, 9 bits long, scale 0.066666.... (1/15)
-              c3iac = (((uint16_t)(msg.data[5] >> 1)) + (((uint16_t)msg.data[6]) << 7))/15;
+              // iac is at bit 41, 9 bits long, scale 0.066666.... (1/15) -- byte 5 bits 1-7 plus
+              // byte 6 bits 0-1. Mask byte 6: the bits above the field are not mapped to
+              // anything in the charger, so letting them through corrupts the reading.
+              c3iac = (((uint16_t)(msg.data[5] >> 1)) | (((uint16_t)(msg.data[6] & 0x03)) << 7))/15;
               sendChargerInfo();
               break;
             }

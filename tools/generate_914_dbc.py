@@ -42,12 +42,16 @@ import sys
 # Bump MAJOR when an existing signal moves, changes scaling, or a message id changes -- an old
 # consumer would decode wrongly. Bump MINOR when signals or messages are only added -- an old
 # consumer decodes everything it knows and simply misses the new data.
+# 4.1 (2026-08-22): the charger's own RX map transcribed -- Tesla module state, DC and
+# temperatures, the two signals missing from the AC frames, and the VCU's two command frames.
+# MINOR: every existing signal decodes exactly as before, an old consumer just misses the new
+# messages.
 # 4.0 (2026-08-18): InvIq scaling negated, so the torque-producing current reads positive when
 # the car drives forward. MAJOR, not MINOR, and the rule above is why -- an old consumer decoding
 # with factor +0.1 gets a plausible, correctly-scaled, wrong-signed number. That is precisely the
 # "plausible wrong numbers rather than an error" case the SchemaId comment reserves quarantine for.
 SCHEMA_MAJOR = 4
-SCHEMA_MINOR = 0
+SCHEMA_MINOR = 1
 
 NUM_CELLS = 168          # NUM_CHIPS * NUM_CELLS_PER_CHIP
 CELLS_IN_SERIES = 84     # NUM_CHIPS * NUM_CELLS_PER_CHIP / NUM_STRINGS -- two parallel strings
@@ -85,6 +89,23 @@ ID_INVERTER_THR = 0x004
 ID_VCU_CONTROL = 0x03F
 ID_CHARGER_AC  = (0x207, 0x209, 0x20B)
 
+# The rest of what the Tesla modules broadcast. The charger controller receives all of this and
+# uses it internally -- CalcTotals() sums Idc and takes the highest Udc, CheckChargerFaults()
+# watches Stt and Flag -- but none of it was transmitted onward, so it sat on the bus undescribed.
+# Transcribed from the AddRecv calls in stm32-teslacharger/src/chargercan.cpp; every position,
+# length, gain and offset below is copied from there rather than inferred from a capture.
+#
+# These frames only exist while AC is connected: the modules are unpowered otherwise.
+#
+# Not included: 0x247/0x249/0x24B (cNtmplim). Those AddRecv lines are commented out in the
+# charger ("We don't have enough space for all messages"), so the charger does not receive them
+# and they are not part of what the source defines. They are also self-inconsistent as written --
+# the call passes gain 7 while the trailing comment says 0.234375 -- so an entry here would be a
+# guess rather than a transcription.
+ID_CHARGER_STT = (0x217, 0x219, 0x21B)
+ID_CHARGER_DC  = (0x227, 0x229, 0x22B)
+ID_CHARGER_TMP = (0x237, 0x239, 0x23B)
+
 # openinverter's SDO server, the only route to parameters the CAN map cannot carry. nodeid is 1
 # on this car, so 0x600+1 for the request and 0x580+1 for the reply -- the same pair CanSdo
 # registers as a user message filter. See notes/inverter-sdo-polling.md.
@@ -106,6 +127,12 @@ ID_CHGCTL_CHADEMO_STATUS = 0x109
 ID_CHGCTL_IDENT          = 0x368
 ID_CHGCTL_MODULE         = (0x42C, 0x43C, 0x44C)
 ID_CHGCTL_COMMAND        = 0x45C
+
+# The other direction: what the VCU sends the charger. 0x102 is upstream's CHAdeMO RX map, reused;
+# 0x103 is ours, added for the dash termination and module knobs. Both are transcribed from the
+# AddRecv calls, same as the module frames above.
+ID_CHGCMD_CHADEMO  = 0x102
+ID_CHGCMD_SETPOINT = 0x103
 
 out = []
 _allocated = {}
@@ -429,10 +456,40 @@ for _ident, _name, _tx, _rx in ((ID_INVERTER_SDO_REQ, "InverterSdoReq", "VCU", "
     sig("SdoData", 32, 32, signed=True, lo=-2147483648, hi=2147483647, rx=_rx)
     emit()
 
+# Gain 0.06666f in the charger source for both AC currents. Written as 1/15 here, which is what
+# that constant approximates and what the existing Iac entry already used; keeping the two
+# consistent matters more than the fifth decimal, and a mixed pair inside one message would look
+# like a real difference.
+_AC_GAIN = 1.0 / 15.0
+
 for n, ident in enumerate(ID_CHARGER_AC, start=1):
     msg(ident, "Charger%dAc" % n, 8, tx="CHARGER", extended=False)
     sig("Uac", 8, 8, unit="V")
-    sig("Iac", 41, 9, factor=1.0 / 15.0, hi=34.1, unit="A")
+    # Two bits only. The charger's CHFLAGS enum names a third value, 4=CheckAlive, which does not
+    # fit the mapped width -- so whatever the modules report there, the charger cannot see it.
+    sig("Flag", 17, 2, hi=3)
+    # All three AC frames carry this and the charger maps all three onto the same parameter, so
+    # the last frame to arrive wins. Present per-module here because that is what is on the wire.
+    sig("HwAcLim", 32, 9, factor=_AC_GAIN, hi=34.1, unit="A")
+    sig("Iac", 41, 9, factor=_AC_GAIN, hi=34.1, unit="A")
+    emit()
+
+for n, ident in enumerate(ID_CHARGER_STT, start=1):
+    msg(ident, "Charger%dStatus" % n, 8, tx="CHARGER", extended=False)
+    sig("Stt", 0, 8)
+    emit()
+
+for n, ident in enumerate(ID_CHARGER_DC, start=1):
+    msg(ident, "Charger%dDc" % n, 8, tx="CHARGER", extended=False)
+    sig("Udc", 16, 16, factor=0.01052856, hi=690.09, unit="V")
+    sig("Idc", 32, 16, factor=0.000839233, hi=55.0, unit="A")
+    emit()
+
+for n, ident in enumerate(ID_CHARGER_TMP, start=1):
+    msg(ident, "Charger%dTemps" % n, 8, tx="CHARGER", extended=False)
+    sig("Tmp1", 0, 8, offset=-40, lo=-40, hi=215, unit="degC")
+    sig("Tmp2", 8, 8, offset=-40, lo=-40, hi=215, unit="degC")
+    sig("TmpIn", 40, 8, offset=-40, lo=-40, hi=215, unit="degC")
     emit()
 
 # ------------------------------------------- charger controller (our own stm32-teslacharger)
@@ -490,6 +547,40 @@ sig("ChademoIdc", 24, 16, unit="A")
 # in one write, per the source comment.
 _f, _o = inv_gain(5)
 sig("ChademoOpmode", 40, 3, factor=_f, offset=_o, hi=1)
+emit()
+
+# ------------------------------------------------- VCU -> charger commands (0x102, 0x103)
+
+# Everything the charger receives here goes through CanMap::HandleRx -> Param::Set, which ignores
+# any value outside the parameter's min/max and keeps the previous one. That is deliberate
+# clamping -- a garbage frame cannot drive the charger out of range -- but it is silent: no fault,
+# no log. A byte-swapped or zeroed field is indistinguishable from the charger never having been
+# mapped at all, which is worth knowing when a decode of these frames looks correct but the
+# charger is not following it.
+
+msg(ID_CHGCMD_CHADEMO, "ChargerCmdChademo", 8, tx="VCU", extended=False)
+# Upstream's CHAdeMO RX map, reused as the VCU's command frame. UdcLim is the termination point:
+# the charger's CheckVoltage() trips its state machine to STOP once udc exceeds this for ten
+# consecutive ticks, and STOP latches until AC is unplugged or enable drops.
+sig("UdcLim", 8, 16, hi=420, unit="V")
+sig("IdcSpnt", 24, 8, hi=45, unit="A")
+# Only consulted while the charger's cancontrol parameter is set, which it is not on this car --
+# enable comes from the hardware line. Left in the map because upstream put it there.
+sig("CanEnable", 40, 1, hi=1)
+sig("Soc", 48, 8, hi=100, unit="%")
+emit()
+
+msg(ID_CHGCMD_SETPOINT, "ChargerCmdSetpoint", 8, tx="VCU", extended=False)
+# The CV regulation setpoint. The charger streams it straight out to the modules on 0x45C every
+# 100 ms, so a change takes effect within one period and no state machine is involved.
+sig("UdcSpnt", 0, 16, hi=420, unit="V")
+# Which modules run, as a bitmask: 1|2|4. Latched into the hardware enable lines at the charger's
+# WAITSTART -> ENABLE transition and not changeable afterwards. 0 is below the parameter minimum
+# of 1, so sending 0 is the way to say "leave the module set alone".
+sig("ChargerEna", 16, 8, hi=7)
+# When set, the charger picks the module count itself from the advertised supply current and
+# overwrites ChargerEna with the result.
+sig("ChargerAuto", 24, 8, hi=1)
 emit()
 
 # ---------------------------------------------------------------- comments
@@ -575,11 +666,33 @@ comment_msg(ID_INVERTER_SDO_RESP,
             "build, which retrying cannot fix. For a parameter read SdoData is s32fp: divide by "
             "32, signed.", extended=False)
 comment_sig(ID_CHARGER_AC[0], "Iac",
-            "Comment in Main.cpp says 9 bits at bit 41, but the extraction reads 15 bits "
-            "(data[5]>>1 plus data[6]<<7). Encoded here as the documented 9. Confirm the "
-            "upper bits are always zero.", extended=False)
+            "9 bits at bit 41, spanning byte 5 bits 1-7 and byte 6 bits 0-1. Main.cpp used to "
+            "read 15 bits here (data[5]>>1 plus data[6]<<7), taking six bits above the field "
+            "that the charger maps to nothing; fixed 2026-08-22 to mask byte 6 to two bits.",
+            extended=False)
+comment_sig(ID_CHARGER_AC[0], "HwAcLim",
+            "Hardware AC current limit reported by the module. All three modules send their own "
+            "and the charger maps every one onto a single hwaclim parameter, so on the charger "
+            "side the last frame received wins.", extended=False)
+comment_msg(ID_CHARGER_DC[0],
+            "Module DC output, measured at the module rather than at the pack. The charger sums "
+            "Idc across the three for its idc, and takes the highest Udc of the three as its "
+            "udc -- which is the value CheckVoltage() compares against udclim to terminate a "
+            "charge.", extended=False)
+comment_msg(ID_CHARGER_TMP[0],
+            "Module temperatures, offset -40 degC. Tmp1 and Tmp2 are module-internal, TmpIn is "
+            "the inlet. Which of the three track real conditions has not been checked against a "
+            "logged session yet.", extended=False)
+comment_msg(ID_CHGCMD_SETPOINT,
+            "VCU to charger. UdcSpnt is the CV regulation target; the termination point in the "
+            "other charge mode is UdcLim on 0x102 instead. Which of the two carries the "
+            "knob-selected target is what the dash mode switch chooses.", extended=False)
 
 emit()
+# CHFLAGS from stm32-teslacharger/include/param_prj.h. A bitfield: bit 0 Enabled, bit 1
+# Fault, bit 2 CheckAlive. Only two bits are mapped, so CheckAlive cannot appear.
+for _ac_id in ID_CHARGER_AC:
+    emit('VAL_ %d Flag 0 "None" 1 "Enabled" 2 "Fault" 3 "EnabledFault" ;' % _ac_id)
 emit('VAL_ %d DiagCode 0 "None" 1 "PecFailure" 2 "BmsFault" 3 "ThreadStartFailure" '
      '4 "InvalidMessage" 5 "SdoAbort" ;' % (ID_DIAG | EXT))
 # openinverter's own OPMODES and DIRS, verbatim from stm32-sine/param_prj.h.

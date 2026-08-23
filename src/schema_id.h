@@ -7,7 +7,7 @@
 #define SCHEMA_ID_H
 
 #define SCHEMA_MAJOR 0x04u
-#define SCHEMA_MINOR 0x00u
-#define SCHEMA_HASH  0xAA2F9C55u
+#define SCHEMA_MINOR 0x01u
+#define SCHEMA_HASH  0x291FD010u
 
 #endif // SCHEMA_ID_H

@@ -628,15 +628,57 @@ BO_ 1409 InverterSdoResp: 8 INVERTER
 
 BO_ 519 Charger1Ac: 8 CHARGER
  SG_ Uac : 8|8@1+ (1,0) [0|255] "V" LOGGER
+ SG_ Flag : 17|2@1+ (1,0) [0|3] "" LOGGER
+ SG_ HwAcLim : 32|9@1+ (0.06666666666666667,0) [0|34.1] "A" LOGGER
  SG_ Iac : 41|9@1+ (0.06666666666666667,0) [0|34.1] "A" LOGGER
 
 BO_ 521 Charger2Ac: 8 CHARGER
  SG_ Uac : 8|8@1+ (1,0) [0|255] "V" LOGGER
+ SG_ Flag : 17|2@1+ (1,0) [0|3] "" LOGGER
+ SG_ HwAcLim : 32|9@1+ (0.06666666666666667,0) [0|34.1] "A" LOGGER
  SG_ Iac : 41|9@1+ (0.06666666666666667,0) [0|34.1] "A" LOGGER
 
 BO_ 523 Charger3Ac: 8 CHARGER
  SG_ Uac : 8|8@1+ (1,0) [0|255] "V" LOGGER
+ SG_ Flag : 17|2@1+ (1,0) [0|3] "" LOGGER
+ SG_ HwAcLim : 32|9@1+ (0.06666666666666667,0) [0|34.1] "A" LOGGER
  SG_ Iac : 41|9@1+ (0.06666666666666667,0) [0|34.1] "A" LOGGER
+
+BO_ 535 Charger1Status: 8 CHARGER
+ SG_ Stt : 0|8@1+ (1,0) [0|255] "" LOGGER
+
+BO_ 537 Charger2Status: 8 CHARGER
+ SG_ Stt : 0|8@1+ (1,0) [0|255] "" LOGGER
+
+BO_ 539 Charger3Status: 8 CHARGER
+ SG_ Stt : 0|8@1+ (1,0) [0|255] "" LOGGER
+
+BO_ 551 Charger1Dc: 8 CHARGER
+ SG_ Udc : 16|16@1+ (0.01052856,0) [0|690.09] "V" LOGGER
+ SG_ Idc : 32|16@1+ (0.000839233,0) [0|55.0] "A" LOGGER
+
+BO_ 553 Charger2Dc: 8 CHARGER
+ SG_ Udc : 16|16@1+ (0.01052856,0) [0|690.09] "V" LOGGER
+ SG_ Idc : 32|16@1+ (0.000839233,0) [0|55.0] "A" LOGGER
+
+BO_ 555 Charger3Dc: 8 CHARGER
+ SG_ Udc : 16|16@1+ (0.01052856,0) [0|690.09] "V" LOGGER
+ SG_ Idc : 32|16@1+ (0.000839233,0) [0|55.0] "A" LOGGER
+
+BO_ 567 Charger1Temps: 8 CHARGER
+ SG_ Tmp1 : 0|8@1+ (1,-40) [-40|215] "degC" LOGGER
+ SG_ Tmp2 : 8|8@1+ (1,-40) [-40|215] "degC" LOGGER
+ SG_ TmpIn : 40|8@1+ (1,-40) [-40|215] "degC" LOGGER
+
+BO_ 569 Charger2Temps: 8 CHARGER
+ SG_ Tmp1 : 0|8@1+ (1,-40) [-40|215] "degC" LOGGER
+ SG_ Tmp2 : 8|8@1+ (1,-40) [-40|215] "degC" LOGGER
+ SG_ TmpIn : 40|8@1+ (1,-40) [-40|215] "degC" LOGGER
+
+BO_ 571 Charger3Temps: 8 CHARGER
+ SG_ Tmp1 : 0|8@1+ (1,-40) [-40|215] "degC" LOGGER
+ SG_ Tmp2 : 8|8@1+ (1,-40) [-40|215] "degC" LOGGER
+ SG_ TmpIn : 40|8@1+ (1,-40) [-40|215] "degC" LOGGER
 
 BO_ 1116 ChargerCtlCommand: 8 CHARGER
  SG_ DcSetpoint : 0|16@1+ (0.01,0) [0|655.35] "V" LOGGER
@@ -681,6 +723,17 @@ BO_ 265 ChargerCtlChademoStatus: 8 CHARGER
  SG_ ChademoIdc : 24|16@1+ (1,0) [0|65535] "A" LOGGER
  SG_ ChademoOpmode : 40|3@1+ (0.2,-0.0) [0|1] "" LOGGER
 
+BO_ 258 ChargerCmdChademo: 8 VCU
+ SG_ UdcLim : 8|16@1+ (1,0) [0|420] "V" LOGGER
+ SG_ IdcSpnt : 24|8@1+ (1,0) [0|45] "A" LOGGER
+ SG_ CanEnable : 40|1@1+ (1,0) [0|1] "" LOGGER
+ SG_ Soc : 48|8@1+ (1,0) [0|100] "%" LOGGER
+
+BO_ 259 ChargerCmdSetpoint: 8 VCU
+ SG_ UdcSpnt : 0|16@1+ (1,0) [0|420] "V" LOGGER
+ SG_ ChargerEna : 16|8@1+ (1,0) [0|7] "" LOGGER
+ SG_ ChargerAuto : 24|8@1+ (1,0) [0|1] "" LOGGER
+
 CM_ BO_ 2667577344 "BMS status and faults, one per cell-sense scan (10 Hz, 2 Hz charging). Latched and instantaneous fault bits are both present on purpose: the dash lamp follows the instantaneous state while the inverter's 50 percent throttle limit follows the latched one, so a single-cycle sag half-throttles the car with only a lamp flicker. Logging both makes that divergence visible.";
 CM_ SG_ 2667577344 IoexpMask "MCP_BMS_THREAD_MASK. Bits outside this mask are not owned by the BMS thread and the Ioexp_ signals say nothing about them.";
 CM_ SG_ 2667577344 Ioexp_G "Mirror of the literal byte passed to MCP23017::write_mask(), so the log records what the dash was told rather than a reconstruction of it.";
@@ -695,8 +748,15 @@ CM_ SG_ 1 InvDcVoltage "HV DC bus voltage. Scale is 0.1 V because the inverter's
 CM_ BO_ 63 "Transmitted by the VCU, so the proxy never receives it -- a CAN node does not see its own frames. It must be echoed into the log deliberately at transmit request, which is evidence of intent rather than proof of arbitration success. Only BmsLimit is verified; the rest of the layout is not yet mapped.";
 CM_ BO_ 1537 "SDO read request from the VCU to the inverter, 0x600 + nodeid. The VCU polls pot (id 2015), pot2 (2016) and regenpreset (2051) round-robin, one outstanding at a time, at 10 Hz while opmode is not Off and 1 Hz otherwise. Parameters are named by unique ID -- index 0x2100 | (id >> 8), subIndex id & 0xFF -- and NOT by array position under index 0x2000, because positions shift between firmware builds. Transmitted by the VCU, so like 0x03F it is echoed into the log at transmit request rather than received. A request with no matching reply before the next poll is a dropped sample; it is visible in the log as a 0x601 with no 0x581 after it, which is why no separate loss counter exists. Strictly a diagnostic path: SDO has no sequence counter, no CRC and no timeout semantics, so nothing in the control loop may depend on it.";
 CM_ BO_ 1409 "SDO reply from the inverter, 0x580 + nodeid. The requested index and subIndex are echoed, so a request and its reply pair exactly even if the reply is late. SdoCmd 0x43 is a successful read; 0x80 is an abort, and then SdoData is the abort code rather than a value -- 0x06020000 means the index is wrong for this firmware build, which retrying cannot fix. For a parameter read SdoData is s32fp: divide by 32, signed.";
-CM_ SG_ 519 Iac "Comment in Main.cpp says 9 bits at bit 41, but the extraction reads 15 bits (data[5]>>1 plus data[6]<<7). Encoded here as the documented 9. Confirm the upper bits are always zero.";
+CM_ SG_ 519 Iac "9 bits at bit 41, spanning byte 5 bits 1-7 and byte 6 bits 0-1. Main.cpp used to read 15 bits here (data[5]>>1 plus data[6]<<7), taking six bits above the field that the charger maps to nothing; fixed 2026-08-22 to mask byte 6 to two bits.";
+CM_ SG_ 519 HwAcLim "Hardware AC current limit reported by the module. All three modules send their own and the charger maps every one onto a single hwaclim parameter, so on the charger side the last frame received wins.";
+CM_ BO_ 551 "Module DC output, measured at the module rather than at the pack. The charger sums Idc across the three for its idc, and takes the highest Udc of the three as its udc -- which is the value CheckVoltage() compares against udclim to terminate a charge.";
+CM_ BO_ 567 "Module temperatures, offset -40 degC. Tmp1 and Tmp2 are module-internal, TmpIn is the inlet. Which of the three track real conditions has not been checked against a logged session yet.";
+CM_ BO_ 259 "VCU to charger. UdcSpnt is the CV regulation target; the termination point in the other charge mode is UdcLim on 0x102 instead. Which of the two carries the knob-selected target is what the dash mode switch chooses.";
 
+VAL_ 519 Flag 0 "None" 1 "Enabled" 2 "Fault" 3 "EnabledFault" ;
+VAL_ 521 Flag 0 "None" 1 "Enabled" 2 "Fault" 3 "EnabledFault" ;
+VAL_ 523 Flag 0 "None" 1 "Enabled" 2 "Fault" 3 "EnabledFault" ;
 VAL_ 2667577584 DiagCode 0 "None" 1 "PecFailure" 2 "BmsFault" 3 "ThreadStartFailure" 4 "InvalidMessage" 5 "SdoAbort" ;
 VAL_ 2 InvOpmode 0 "Off" 1 "Run" 2 "ManualRun" 3 "Boost" 4 "Buck" 5 "Sine" 6 "AcHeat" ;
 VAL_ 1537 SdoCmd 64 "Read" 67 "ReadReply" 35 "Write" 96 "WriteReply" 128 "Abort" ;
@@ -704,5 +764,5 @@ VAL_ 1409 SdoCmd 64 "Read" 67 "ReadReply" 35 "Write" 96 "WriteReply" 128 "Abort"
 VAL_ 2 InvIo_Ocur 0 "Error" 1 "Ok" 2 "na" ;
 VAL_ 2 InvIo_Desat 0 "Error" 1 "Ok" 2 "na" ;
 
-CM_ "914 EV telemetry schema 4.0, SCHEMA_HASH=0xAA2F9C55. Generated by generate_914_dbc.py -- do not hand-edit.";
+CM_ "914 EV telemetry schema 4.1, SCHEMA_HASH=0x291FD010. Generated by generate_914_dbc.py -- do not hand-edit.";
 
