@@ -465,8 +465,12 @@ _AC_GAIN = 1.0 / 15.0
 for n, ident in enumerate(ID_CHARGER_AC, start=1):
     msg(ident, "Charger%dAc" % n, 8, tx="CHARGER", extended=False)
     sig("Uac", 8, 8, unit="V")
-    # Two bits only. The charger's CHFLAGS enum names a third value, 4=CheckAlive, which does not
-    # fit the mapped width -- so whatever the modules report there, the charger cannot see it.
+    # Two bits, and that width is the mechanism rather than a shortfall. The charger's CHFLAGS
+    # enum has a third value, 4=CheckAlive, which it sets on itself: CheckChargerFaults() ORs the
+    # bit in on every pass, and the next frame from the module clears it, because a CanMap receive
+    # overwrites the whole parameter from this 2-bit field. A module that stops transmitting stops
+    # clearing it, and that is what raises the timeout fault. So bit 2 is never on the wire and a
+    # wider field here would break the liveness check.
     sig("Flag", 17, 2, hi=3)
     # All three AC frames carry this and the charger maps all three onto the same parameter, so
     # the last frame to arrive wins. Present per-module here because that is what is on the wire.
@@ -670,6 +674,12 @@ comment_sig(ID_CHARGER_AC[0], "Iac",
             "read 15 bits here (data[5]>>1 plus data[6]<<7), taking six bits above the field "
             "that the charger maps to nothing; fixed 2026-08-22 to mask byte 6 to two bits.",
             extended=False)
+comment_sig(ID_CHARGER_AC[0], "Flag",
+            "Module status bits: 1 Enabled, 2 Fault. Two bits is the full wire field. The "
+            "charger's third flag value, 4=CheckAlive, is one it sets on itself and expects "
+            "this frame to clear by overwriting -- a module that goes quiet leaves it set, "
+            "which is how the charger detects a dead module. It is never transmitted.",
+            extended=False)
 comment_sig(ID_CHARGER_AC[0], "HwAcLim",
             "Hardware AC current limit reported by the module. All three modules send their own "
             "and the charger maps every one onto a single hwaclim parameter, so on the charger "
@@ -689,8 +699,9 @@ comment_msg(ID_CHGCMD_SETPOINT,
             "knob-selected target is what the dash mode switch chooses.", extended=False)
 
 emit()
-# CHFLAGS from stm32-teslacharger/include/param_prj.h. A bitfield: bit 0 Enabled, bit 1
-# Fault, bit 2 CheckAlive. Only two bits are mapped, so CheckAlive cannot appear.
+# CHFLAGS from stm32-teslacharger/include/param_prj.h, restricted to the two bits the module
+# actually sends. Bit 2 (CheckAlive) is the charger's own liveness marker, never transmitted --
+# see the comment on the signal.
 for _ac_id in ID_CHARGER_AC:
     emit('VAL_ %d Flag 0 "None" 1 "Enabled" 2 "Fault" 3 "EnabledFault" ;' % _ac_id)
 emit('VAL_ %d DiagCode 0 "None" 1 "PecFailure" 2 "BmsFault" 3 "ThreadStartFailure" '
