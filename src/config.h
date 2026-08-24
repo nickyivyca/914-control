@@ -192,7 +192,7 @@
 #define KNOB_SW_PUSHED_IN 1
 
 // Stepped-knob detent centres, raw 16-bit ADC:
-//   0, 13091, 26334, 39425, 52592, 65535
+//   0, 13091, 26334, 39417, 52588, 65535
 // Evenly spaced to within ~200 counts of a perfect six-way divider (65535/5 = 13107), and dead
 // flat once rested -- the spread within a detent is under 70 counts. Thresholds below are the
 // midpoints between adjacent centres, so the nearest threshold is ~6500 counts from any detent
@@ -200,9 +200,9 @@
 #define KNOB_STEP_COUNT 6
 #define KNOB_STEP_THRESH_0 6546
 #define KNOB_STEP_THRESH_1 19713
-#define KNOB_STEP_THRESH_2 32880
-#define KNOB_STEP_THRESH_3 46009
-#define KNOB_STEP_THRESH_4 59064
+#define KNOB_STEP_THRESH_2 32876
+#define KNOB_STEP_THRESH_3 46003
+#define KNOB_STEP_THRESH_4 59062
 
 // Detent -> charger module selection. Detents 0-3 are used; 4 and 5 are deliberately reserved
 // for a future mode that charges to a manual current limit, for supplies with no EVSE pilot to
