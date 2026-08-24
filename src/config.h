@@ -171,6 +171,53 @@
 #define TELEMETRY_EMIT_KNOBS 0
 #endif
 
+// ---------------------------------------------------------------- dash knob map
+//
+// Measured on the car 2026-08-23, not assumed -- see notes/plans/charger-knob-control.md Step 3.
+// The knobs had been removed and refitted since any code read them and the previous WIP's
+// assignments were wrong in two ways: it read p20 while the stepped knob was temporarily jumpered
+// to p19, and p19 is not an analog input in this firmware at all (it is DI_ReverseSwitch, whose
+// state feeds din_bms in the 0x3F control frame). The knob has since been moved back to p20.
+//
+//   Left, stepped  -> p20 (PIN_ANALOG_KNOB3)  6 detents, no switch   -- charger module count
+//   Middle         -> p15 (PIN_ANALOG_KNOB1)  continuous, switch 11  -- termination point + mode
+//   Right          -> p16 (PIN_ANALOG_KNOB2)  continuous, switch 12  -- UNMAPPED
+//
+// Both continuous knobs peg at 0 and 65535, so they use the full ADC range and the SoC mapping
+// should clamp at the rails rather than assume headroom past them.
+//
+// Switch polarity is the opposite of the usual pull-to-ground reading: pushed IN reads 1, pulled
+// OUT reads 0. Measured in both directions on both switches. The old WIP assumed the reverse,
+// which would have inverted the CC/CV selection.
+#define KNOB_SW_PUSHED_IN 1
+
+// Stepped-knob detent centres, raw 16-bit ADC:
+//   0, 13091, 26334, 39425, 52592, 65535
+// Evenly spaced to within ~200 counts of a perfect six-way divider (65535/5 = 13107), and dead
+// flat once rested -- the spread within a detent is under 70 counts. Thresholds below are the
+// midpoints between adjacent centres, so the nearest threshold is ~6500 counts from any detent
+// and a misread is not a realistic failure mode.
+#define KNOB_STEP_COUNT 6
+#define KNOB_STEP_THRESH_0 6546
+#define KNOB_STEP_THRESH_1 19713
+#define KNOB_STEP_THRESH_2 32880
+#define KNOB_STEP_THRESH_3 46009
+#define KNOB_STEP_THRESH_4 59064
+
+// Detent -> charger module selection. Detents 0-3 are used; 4 and 5 are deliberately reserved
+// for a future mode that charges to a manual current limit, for supplies with no EVSE pilot to
+// read. Until that exists they must behave as "leave the module set alone" rather than falling
+// through to a default -- a reserved detent that silently means "three modules" is worse than
+// one that means nothing.
+#define KNOB_MODULES_DETENT_0 1   // 0b001, one module
+#define KNOB_MODULES_DETENT_1 3   // 0b011, two modules
+#define KNOB_MODULES_DETENT_2 7   // 0b111, three modules
+#define KNOB_MODULES_DETENT_3 0   // auto: chargerauto set, chargerena sent as 0 = no change
+#define KNOB_MODULES_RESERVED 0   // detents 4 and 5, reserved -- no change
+
+// Which detent selects auto rather than an explicit count.
+#define KNOB_MODULES_AUTO_DETENT 3
+
 // Replace real telemetry with a deterministic function of a free-running frame counter. This is
 // the link instrument, not a telemetry mode: it is what separates three outcomes that look
 // identical in a log -- frames that never arrived, frames rejected as malformed, and frames

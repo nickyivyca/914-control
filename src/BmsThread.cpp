@@ -1169,8 +1169,23 @@ void BMSThread::threadWorker() {
 #if TELEMETRY_EMIT_KNOBS
       {
         BmsKnobFields kf;
+        // Read each channel twice and keep the second. The LPC1768's ADC shares one
+        // sample-and-hold across the mux, and a conversion started immediately after the channel
+        // is switched can return the previous channel's result. The discarded read lets the hold
+        // capacitor charge to the newly selected pin first.
+        //
+        // Kept as cheap insurance, but honesty about why it is here: it was added on 2026-08-23
+        // to explain p20 tracking p15 at r = 0.9946, and that diagnosis was wrong. p20 simply had
+        // nothing connected to it at the time -- the knob was temporarily jumpered to p19 -- and a
+        // floating input reads the residue of whatever was converted before it. With the knob
+        // reconnected, p20 rests dead flat at zero spread. This costs one extra conversion per
+        // channel and guards a real hardware behaviour, so it stays; it just never fixed anything
+        // that was actually broken.
+        (void)knob1->read_u16();
         kf.knob1Raw = knob1->read_u16();
+        (void)knob2->read_u16();
         kf.knob2Raw = knob2->read_u16();
+        (void)knob3->read_u16();
         kf.knob3Raw = knob3->read_u16();
         kf.gpiPortB = gpiPortB;
         kf.gpiMask  = (uint8_t)((MCP_BMS_THREAD_READ_MASK_ALL >> 8) & 0xFF);

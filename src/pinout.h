@@ -218,10 +218,20 @@ extern PwmOut* fuelgauge;
 #endif
 
 //
-// MCP23017 input side, port B. The mainline firmware does not read these at all; the CC/CV knob
-// switches exist only on the charge-control branch. Byte 7 of the BmsStatus frame is reserved
-// for them so that branch can land without renumbering the frame, and TELEMETRY_READ_GPIO_INPUTS
-// is the one knob that branch has to flip.
+// MCP23017 input side, port B. Byte 7 of the BmsStatus frame carries these, and
+// TELEMETRY_READ_GPIO_INPUTS (or TELEMETRY_EMIT_KNOBS) is what turns the read on.
+//
+// Both switch assignments below were confirmed on the car 2026-08-23 by toggling each one and
+// watching which bit moved -- they are measurements, not the guesses the names imply:
+//
+//   pin 11 -> the MIDDLE knob's switch (p15), which selects CC vs CV termination
+//   pin 12 -> the RIGHT knob's switch (p16), currently unmapped
+//
+// Polarity is inverted from the pull-to-ground reading the pullups suggest: pushed IN reads 1,
+// pulled OUT reads 0. See KNOB_SW_PUSHED_IN in config.h.
+//
+// Pins 13-15 are configured as inputs but have no pullup and nothing connected. They float, and
+// one of them was seen toggling on its own during a capture. Do not read meaning into them.
 //
 #ifndef MCP_PIN_KNOB1SW
 #define MCP_PIN_KNOB1SW 11
