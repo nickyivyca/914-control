@@ -218,6 +218,34 @@
 // Which detent selects auto rather than an explicit count.
 #define KNOB_MODULES_AUTO_DETENT 3
 
+// ------------------------------------------------------- charger command constants
+//
+// Ported from the charge-control WIP (origin/charge-control 581f0cc). Values unchanged.
+//
+// CHARGER_VLIMIT was read back off the charger over the ESP web interface on 2026-08-25:
+// its stored udclim is 346.0, so this constant and the device agree.
+#ifndef CHARGER_VLIMIT
+#define CHARGER_VLIMIT 346
+#endif
+
+// Subtracted from the computed pack target. Placeholder for the charger's udc offset, which
+// has not been characterised yet -- see notes/plans/charger-knob-control.md Step 7.
+#ifndef CHARGER_VSPNT_OFFSET
+#define CHARGER_VSPNT_OFFSET 0
+#endif
+
+// DC current setpoint, amps. Maps to idcspnt in 0x102 bits 24-31 (byte 3).
+//
+// 25 A matches what the charger already had set by hand, read back 2026-08-25, so adopting
+// CAN control of this field changes no behaviour on the car. The WIP sent 30.
+//
+// This field MUST be populated in every 0x102 frame. idcspnt's range is 0-45, so 0 is a
+// legal value meaning zero current, not "leave unchanged" -- a zeroed byte 3 silently stops
+// the charge. Only chargerena (range 1-7) has an out-of-range value usable as "no change".
+#ifndef CHARGER_DC_SPNT
+#define CHARGER_DC_SPNT 25
+#endif
+
 // Replace real telemetry with a deterministic function of a free-running frame counter. This is
 // the link instrument, not a telemetry mode: it is what separates three outcomes that look
 // identical in a log -- frames that never arrived, frames rejected as malformed, and frames
@@ -402,6 +430,10 @@
 #ifndef NUM_CELLS_PER_CHIP
 #define NUM_CELLS_PER_CHIP 14
 #endif
+
+// Series cell count of the pack. The strings are paralleled, so one string's series count
+// is the pack's series count, not the total number of cells.
+#define SERIES_CELLS (NUM_CHIPS / NUM_STRINGS * NUM_CELLS_PER_CHIP)
 
 // Mapping of BMS chip channels to cells
 const int8_t BMS_CELL_MAP[18] = {0, 1, 2, 3, 4, -1, 5, 6, 7, 8, 9, -1, 10, 11, 12, 13, -1, -1};

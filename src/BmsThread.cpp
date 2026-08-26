@@ -159,6 +159,15 @@ union bytes {
 
 uint8_t* const inverterCANSend = inverterCAN.bytes;
 
+union chargerBytes {
+    uint8_t bytes[8];
+    uint32_t words[2];
+    uint64_t bits;
+} chargerCAN102, chargerCAN103;
+
+uint8_t* const chargerCAN102Send = chargerCAN102.bytes;
+uint8_t* const chargerCAN103Send = chargerCAN103.bytes;
+
 
 batterydata_t m_batterydata;
 batterysummary_t m_batterysummary;
@@ -174,6 +183,131 @@ void BMSThread::throwBmsFault(BmsFaultBit fault) {
   faultThrown = true;
   *led2 = 0;
   *led4 = 1;
+}
+// ---------------------------------------------------------------- charger command frames
+//
+// Two frames drive the Tesla charger. Their field layout is fixed by the charger's own RX map
+// (stm32-teslacharger, src/chargercan.cpp, the block headed "CHAdeMO RX" -- that header is only
+// a label, there is no CHAdeMO logic in that firmware). Read back off the car over the ESP web
+// interface on 2026-08-25 and confirmed identical to the source:
+//
+//   0x102  udclim      bits  8-23  little endian  termination voltage
+//          idcspnt     bits 24-31                 DC current setpoint, amps
+//          canenable   bit  40                    CAN watchdog, gated by the charger's cancontrol
+//          soc         bits 48-55                 informational only, read by nothing
+//   0x103  udcspnt     bits  0-15  little endian  CV regulation setpoint
+//          chargerena  bits 16-23                 module bitmask, 1|2|4
+//          chargerauto bits 24-31                 needs a charger built with chargerauto; on
+//                                                 older builds the byte is unmapped and ignored
+//
+// Mode. The termination knob's switch chooses which of the two voltages is the knob target:
+//
+//   pushed IN  -> CV: udcspnt = target, udclim = CHARGER_VLIMIT
+//                     regulate at the target and hold there so the BMS can balance.
+//   pulled OUT -> CC: udcspnt = CHARGER_VLIMIT, udclim = target
+//                     never regulate down, so the charger runs at current until CheckVoltage()
+//                     trips it to STOP at the target.
+//
+// Byte order here is not cosmetic. The WIP this replaces (origin/charge-control 581f0cc) had the
+// CC branch byte-swapped in BOTH frames, and that is what "the charger did not accept the
+// setpoints" actually was: swapped, 333 V becomes 0x4D01 = 19713 and 346 V becomes 0x5A01 =
+// 23041, both far outside the charger's 50-420 V range for udcspnt and udclim. Param::Set
+// rejects out-of-range values silently, so the charger simply kept its previous ones. The CV
+// branch was byte-correct, which is why a stale udcspnt of 333 V was still sitting in the
+// charger when this was written. That commit's own message concluded the opposite -- that the CV
+// branch was the broken one -- so do not trust it over this.
+//
+// Gating. 0x103 goes out every cycle, unconditionally. The charger latches chargerena only on the
+// WAITSTART -> ENABLE transition and ignores it while running, so it has to be in place already
+// when the enable line comes up; gating it on the charge switch would race it against the enable.
+// 0x102 is sent only while charging, since udclim and idcspnt mean nothing otherwise.
+//
+// Every field of 0x102 must be populated deliberately. idcspnt's range is 0-45, so a zeroed
+// byte 3 does not mean "leave this alone" -- it commands zero current and stops the charge. Only
+// chargerena, range 1-7, has an out-of-range value usable as "no change".
+
+// Raw stepped-knob reading -> detent index. Thresholds are the measured detent midpoints; see
+// the dash knob map in config.h.
+static uint8_t knobDetent(uint16_t raw) {
+  if (raw < KNOB_STEP_THRESH_0) return 0;
+  if (raw < KNOB_STEP_THRESH_1) return 1;
+  if (raw < KNOB_STEP_THRESH_2) return 2;
+  if (raw < KNOB_STEP_THRESH_3) return 3;
+  if (raw < KNOB_STEP_THRESH_4) return 4;
+  return KNOB_STEP_COUNT - 1;
+}
+
+// Termination knob -> pack voltage. Full travel spans 20%-100% SoC, clockwise raising the
+// target. The per-cell voltage comes from SoC_lookup (mV, indexed by SoC%), interpolated, times
+// the series cell count.
+//
+// The clamp to CHARGER_VLIMIT matters: SoC_lookup[100] * 84 is 351 V while the limit is 346, so
+// an unclamped full-knob CV request would ask the charger to regulate at a voltage its own
+// udclim forbids it to reach, and CheckVoltage() would trip STOP instead of holding.
+static uint16_t chargerPackTarget() {
+  float socf = 20.0f + knob1->read() * 80.0f;
+  if (socf < 20.0f) socf = 20.0f;
+  if (socf > 100.0f) socf = 100.0f;
+
+  int i = (int)socf;
+  float frac = socf - i;
+  if (i >= 100) { i = 100; frac = 0.0f; }
+
+  float cellmv = SoC_lookup[i] + frac * (SoC_lookup[i + 1] - SoC_lookup[i]);
+  int v = (int)(cellmv * SERIES_CELLS / 1000.0f + 0.5f) - CHARGER_VSPNT_OFFSET;
+
+  if (v > CHARGER_VLIMIT) v = CHARGER_VLIMIT;
+  if (v < 50) v = 50;   // the charger's own floor for udcspnt and udclim
+  return (uint16_t)v;
+}
+
+void BMSThread::sendChargerFrames() {
+  const uint16_t gpi = ioexp->read_mask(MCP_BMS_THREAD_READ_MASK);
+  const bool pushedIn =
+      (((gpi & MCP_PIN_BIT(MCP_PIN_KNOB1SW)) ? 1 : 0) == KNOB_SW_PUSHED_IN);
+  const bool cvMode = pushedIn;
+  const uint16_t target = chargerPackTarget();
+
+  // ---- 0x103: module selection and the CV setpoint. Always sent.
+  uint8_t ena, autosel;
+  switch (knobDetent(knob3->read_u16())) {
+    case 0:  ena = KNOB_MODULES_DETENT_0; autosel = 0; break;
+    case 1:  ena = KNOB_MODULES_DETENT_1; autosel = 0; break;
+    case 2:  ena = KNOB_MODULES_DETENT_2; autosel = 0; break;
+    case KNOB_MODULES_AUTO_DETENT:
+             ena = KNOB_MODULES_DETENT_3; autosel = 1; break;
+    // Detents 4 and 5 are reserved for a future manual-current-limit mode. Until then they
+    // command nothing: chargerena 0 is out of range so the charger keeps its module set, and
+    // chargerauto 0 leaves auto off. Turning to a reserved detent from auto therefore holds
+    // whatever count auto last chose rather than falling back to a default.
+    default: ena = KNOB_MODULES_RESERVED; autosel = 0; break;
+  }
+
+  const uint16_t spnt = cvMode ? target : CHARGER_VLIMIT;
+
+  chargerCAN103.bits = 0;
+  chargerCAN103.bytes[0] = (uint8_t)(spnt & 0xFF);
+  chargerCAN103.bytes[1] = (uint8_t)((spnt >> 8) & 0xFF);
+  chargerCAN103.bytes[2] = ena;
+  chargerCAN103.bytes[3] = autosel;
+
+  canBus->write(CANMessage(0x103, chargerCAN103Send, 8));
+  telemetry_echo_frame(TLM_ID_CHARGER_SPNT, chargerCAN103Send, 8);
+
+  // ---- 0x102: termination limit and current. Only while charging.
+  if (!*DI_ChargeSwitch) return;
+
+  const uint16_t lim = cvMode ? CHARGER_VLIMIT : target;
+
+  chargerCAN102.bits = 0;
+  chargerCAN102.bytes[1] = (uint8_t)(lim & 0xFF);
+  chargerCAN102.bytes[2] = (uint8_t)((lim >> 8) & 0xFF);
+  chargerCAN102.bytes[3] = CHARGER_DC_SPNT;
+  chargerCAN102.bytes[5] = *DO_ChargeEnable ? 1 : 0;
+  chargerCAN102.bytes[6] = SoC;
+
+  canBus->write(CANMessage(0x102, chargerCAN102Send, 8));
+  telemetry_echo_frame(TLM_ID_CHARGER_CMD, chargerCAN102Send, 8);
 }
 void BMSThread::threadWorker() {
 
@@ -885,6 +1019,10 @@ void BMSThread::threadWorker() {
       }
 
 
+
+      // Charger command frames. Placed after the charge-enable decision above so the canenable
+      // bit in 0x102 carries this cycle's enable state rather than the previous cycle's.
+      sendChargerFrames();
 
       // printbuff.str(std::string());
 

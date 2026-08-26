@@ -48,6 +48,12 @@
 // this one is echoed into the log deliberately at transmit request -- see telemetry_echo_frame().
 #define TLM_ID_VCU_CONTROL 0x03Fu
 
+// Charger command frames, echoed for the same reason as TLM_ID_VCU_CONTROL above: a CAN node
+// does not receive its own transmissions, so without the echo a log shows the charger's
+// reaction with no record of what it was told.
+#define TLM_ID_CHARGER_CMD  0x102u
+#define TLM_ID_CHARGER_SPNT 0x103u
+
 // Derived frame counts. These are what walk one block into the next when the pack grows, so the
 // static_asserts below stand in for the ID-collision guard the generator already has.
 #define TLM_NUM_CELLS      (NUM_CHIPS * NUM_CELLS_PER_CHIP)

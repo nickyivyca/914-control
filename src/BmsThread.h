@@ -61,4 +61,8 @@ class BMSThread {
   void throwBmsFault(BmsFaultBit fault);
   void threadWorker();
 
+  // Charger command frames on CAN 0x102 and 0x103. See the definition in BmsThread.cpp for
+  // the field layout, the CC/CV mode split, and why 0x103 is not gated on the charge switch.
+  void sendChargerFrames();
+
 };
