@@ -168,6 +168,13 @@ union chargerBytes {
 uint8_t* const chargerCAN102Send = chargerCAN102.bytes;
 uint8_t* const chargerCAN103Send = chargerCAN103.bytes;
 
+// What sendChargerFrames() last transmitted, kept for the dash. The display reads these rather
+// than recomputing from the knobs, because its job is to report what the charger was actually
+// told; recomputing would let the two drift apart without anything catching it.
+uint8_t chargerDispSoc = 20;
+bool chargerDispCv = false;
+char chargerDispModules = '-';
+
 
 batterydata_t m_batterydata;
 batterysummary_t m_batterysummary;
@@ -244,8 +251,20 @@ static uint8_t knobDetent(uint16_t raw) {
 // The clamp to CHARGER_VLIMIT matters: SoC_lookup[100] * 84 is 351 V while the limit is 346, so
 // an unclamped full-knob CV request would ask the charger to regulate at a voltage its own
 // udclim forbids it to reach, and CheckVoltage() would trip STOP instead of holding.
-static uint16_t chargerPackTarget() {
-  float socf = 20.0f + knob1->read() * 80.0f;
+//
+// socOut receives the SoC that the returned voltage actually represents, which is not always the
+// SoC the knob is asking for. The target saturates at CHARGER_VLIMIT part way up the travel --
+// with this table and a 346 V limit, from SoC 95 upward -- so the top 6% of knob travel all
+// produces the same voltage. Reporting the raw knob SoC on the dash would show a number climbing
+// to 100 while the charger sat pinned at 346 V. Walking back to the highest SoC that the clamped
+// voltage still represents keeps the dash an honest proxy for what was sent, and as a side
+// effect bounds the displayed value to two digits.
+static uint16_t chargerPackTarget(uint8_t *socOut) {
+  // Inverted against the raw reading: this pot counts DOWN as it turns clockwise, so full
+  // clockwise is read() ~= 0. Measured on the dash 2026-08-25 -- the first cut used
+  // 20 + read()*80 and showed 20% at the fully clockwise stop. The knob's wiring, not the
+  // maths, decides which end is which, and it cannot be settled from the ADC value alone.
+  float socf = 100.0f - knob1->read() * 80.0f;
   if (socf < 20.0f) socf = 20.0f;
   if (socf > 100.0f) socf = 100.0f;
 
@@ -256,8 +275,17 @@ static uint16_t chargerPackTarget() {
   float cellmv = SoC_lookup[i] + frac * (SoC_lookup[i + 1] - SoC_lookup[i]);
   int v = (int)(cellmv * SERIES_CELLS / 1000.0f + 0.5f) - CHARGER_VSPNT_OFFSET;
 
-  if (v > CHARGER_VLIMIT) v = CHARGER_VLIMIT;
+  if (v > CHARGER_VLIMIT) {
+    v = CHARGER_VLIMIT;
+    while (i > 20 &&
+           (int)(SoC_lookup[i] * SERIES_CELLS / 1000.0f + 0.5f) - CHARGER_VSPNT_OFFSET > v) {
+      i--;
+    }
+    socf = (float)i;
+  }
   if (v < 50) v = 50;   // the charger's own floor for udcspnt and udclim
+
+  *socOut = (uint8_t)(socf + 0.5f);
   return (uint16_t)v;
 }
 
@@ -266,22 +294,29 @@ void BMSThread::sendChargerFrames() {
   const bool pushedIn =
       (((gpi & MCP_PIN_BIT(MCP_PIN_KNOB1SW)) ? 1 : 0) == KNOB_SW_PUSHED_IN);
   const bool cvMode = pushedIn;
-  const uint16_t target = chargerPackTarget();
+  uint8_t effectiveSoc;
+  const uint16_t target = chargerPackTarget(&effectiveSoc);
 
   // ---- 0x103: module selection and the CV setpoint. Always sent.
-  uint8_t ena, autosel;
-  switch (knobDetent(knob3->read_u16())) {
-    case 0:  ena = KNOB_MODULES_DETENT_0; autosel = 0; break;
-    case 1:  ena = KNOB_MODULES_DETENT_1; autosel = 0; break;
-    case 2:  ena = KNOB_MODULES_DETENT_2; autosel = 0; break;
-    case KNOB_MODULES_AUTO_DETENT:
-             ena = KNOB_MODULES_DETENT_3; autosel = 1; break;
-    // Detents 4 and 5 are reserved for a future manual-current-limit mode. Until then they
-    // command nothing: chargerena 0 is out of range so the charger keeps its module set, and
-    // chargerauto 0 leaves auto off. Turning to a reserved detent from auto therefore holds
-    // whatever count auto last chose rather than falling back to a default.
-    default: ena = KNOB_MODULES_RESERVED; autosel = 0; break;
-  }
+  //
+  // A table rather than a switch, so the detent order lives in config.h alone and the two cannot
+  // drift apart. Reserved detents carry 0, which chargerena's 1-7 range rejects, so the charger
+  // keeps its module set; turning to a reserved detent from auto therefore holds whatever count
+  // auto last chose rather than falling back to a default.
+  static const uint8_t moduleForDetent[KNOB_STEP_COUNT] = {
+      KNOB_MODULES_DETENT_0, KNOB_MODULES_DETENT_1, KNOB_MODULES_DETENT_2,
+      KNOB_MODULES_DETENT_3, KNOB_MODULES_DETENT_4, KNOB_MODULES_DETENT_5 };
+
+  const uint8_t detent = knobDetent(knob3->read_u16());
+  const uint8_t ena = moduleForDetent[detent];
+  const uint8_t autosel = (detent == KNOB_MODULES_AUTO_DETENT) ? 1 : 0;
+
+  // Publish for the dash. chargerena is a bitmask, so the module count is its population count:
+  // 1 -> 1, 3 -> 2, 7 -> 3. A reserved detent commands nothing and shows as a dash.
+  chargerDispSoc = effectiveSoc;
+  chargerDispCv = cvMode;
+  chargerDispModules = autosel ? 'A'
+                     : (ena == 0 ? '-' : (char)('0' + __builtin_popcount(ena)));
 
   const uint16_t spnt = cvMode ? target : CHARGER_VLIMIT;
 
@@ -1189,7 +1224,28 @@ void BMSThread::threadWorker() {
       //displayserial->putc(0x80); // move to 0,0
 
       if (*DI_ChargeSwitch) {
-        sprintf(&dispprint[1], "%3dV %2dA %3d", m_chargerdata.VAC, m_chargerdata.IAC, m_batterydata.numBalancing);
+        // Exactly 20 characters wide, which is the whole row. Fixed field widths throughout so
+        // nothing shifts as values change:
+        //   VAC(3) 'V' IAC(2) 'A' balancing(3) targetSoC(2) mode(2) modules(1), single-spaced.
+        // The SoC fits in two digits because chargerPackTarget() saturates it at the voltage
+        // clamp, not because 100% is assumed unreachable.
+        //
+        // VAC and IAC are uint16_t straight off the CAN bus, so a corrupt frame could make either
+        // five digits wide and run the row past the end of the buffer. Clamp them to their field
+        // widths, and use snprintf so the write is bounded to the row no matter what a field does
+        // later. Plain sprintf here compiles with -Wformat-overflow: "output between 21 and 27
+        // bytes into a destination of size 21".
+        unsigned vac  = m_chargerdata.VAC > 999 ? 999 : m_chargerdata.VAC;
+        unsigned iac  = m_chargerdata.IAC > 99 ? 99 : m_chargerdata.IAC;
+        unsigned bal  = m_batterydata.numBalancing;          // uint8_t, 3 digits covers it
+        unsigned tsoc = chargerDispSoc > 99 ? 99 : chargerDispSoc;
+
+        snprintf(&dispprint[1], 21, "%3uV %2uA %3u %2u %2s %c",
+                 vac, iac, bal, tsoc, chargerDispCv ? "CV" : "CC", chargerDispModules);
+        // snprintf NUL-terminates. At exactly 20 characters that NUL lands on dispprint[21], which
+        // is the 0x94 "move to row 1" control byte. The buffer's initialiser does restore it, but
+        // only on the next pass -- the write below happens first, so it has to be put back here.
+        dispprint[21] = 0x94;
       } else {
         int64_t power = m_batterysummary.totalCurrent*((int64_t)m_batterysummary.totalVoltage)/1000000;
         // Guards display overflow

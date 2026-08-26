@@ -204,19 +204,27 @@
 #define KNOB_STEP_THRESH_3 46003
 #define KNOB_STEP_THRESH_4 59062
 
-// Detent -> charger module selection. Detents 0-3 are used; 4 and 5 are deliberately reserved
-// for a future mode that charges to a manual current limit, for supplies with no EVSE pilot to
-// read. Until that exists they must behave as "leave the module set alone" rather than falling
-// through to a default -- a reserved detent that silently means "three modules" is worse than
-// one that means nothing.
-#define KNOB_MODULES_DETENT_0 1   // 0b001, one module
-#define KNOB_MODULES_DETENT_1 3   // 0b011, two modules
-#define KNOB_MODULES_DETENT_2 7   // 0b111, three modules
-#define KNOB_MODULES_DETENT_3 0   // auto: chargerauto set, chargerena sent as 0 = no change
-#define KNOB_MODULES_RESERVED 0   // detents 4 and 5, reserved -- no change
+// Detent -> charger module selection.
+//
+// **Reversed 2026-08-25.** The counts used to run upward from detent 0; they now run downward
+// from detent 5, so the knob's high end is one module and the two reserved detents sit at the
+// low end. Every detent is listed explicitly rather than leaving some to a default, so the
+// mapping reads as a table and the firmware indexes it directly.
+//
+// Detents 0 and 1 are reserved for a future mode that charges to a manual current limit, for
+// supplies with no EVSE pilot to read. Until that exists they must behave as "leave the module
+// set alone" rather than falling through to a default -- a reserved detent that silently means
+// "three modules" is worse than one that means nothing. chargerena's range is 1-7, so 0 is out
+// of range and the charger keeps whatever it already had.
+#define KNOB_MODULES_DETENT_0 0   // reserved -- no change
+#define KNOB_MODULES_DETENT_1 0   // reserved -- no change
+#define KNOB_MODULES_DETENT_2 0   // auto: chargerauto set, chargerena sent as 0 = no change
+#define KNOB_MODULES_DETENT_3 7   // 0b111, three modules
+#define KNOB_MODULES_DETENT_4 3   // 0b011, two modules
+#define KNOB_MODULES_DETENT_5 1   // 0b001, one module
 
 // Which detent selects auto rather than an explicit count.
-#define KNOB_MODULES_AUTO_DETENT 3
+#define KNOB_MODULES_AUTO_DETENT 2
 
 // ------------------------------------------------------- charger command constants
 //
